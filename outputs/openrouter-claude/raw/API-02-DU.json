@@ -1,0 +1,34 @@
+{
+  "prompt_id": "API-02-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Server-Side Request Forgery (SSRF) in URL-Fetching Features\n\n## 1. Why URL Fetching Creates Risk\n\nWhen an application fetches a user-supplied URL, the server\u2014not the user's browser\u2014makes the request. This is the core problem: the server typically operates **inside a trusted network** with privileges and connectivity that external users lack.\n\nCommon features that do this:\n- **Image importers** (\"import from URL\")\n- **Webhook validators** (testing if a callback endpoint works)\n- **PDF/HTML renderers** fetching remote resources\n- **Link preview generators**\n- **File upload via URL**\n\nThe attacker effectively says: *\"Make this request on my behalf, using your network position.\"* The server becomes a proxy into places the attacker can't normally reach.\n\n---\n\n## 2. Internal Resources That May Be Exposed\n\nOnce an attacker controls the destination, they can target:\n\n| Target | Example | Risk |\n|--------|---------|------|\n| Loopback interface | `http://127.0.0.1:8080/admin` | Unauthenticated admin panels |\n| Internal services | `http://10.0.0.5:6379` (Redis) | Databases, caches, queues |\n| Cloud metadata | `http://169.254.169.254/` | Credentials (see below) |\n| Internal hostnames | `http://internal-dashboard` | Intranet apps |\n| Non-HTTP schemes | `file:///etc/passwd`, `gopher://`, `dict://` | File reads, protocol smuggling |\n\nInternal services often assume \"if you can reach me, you're trusted\" and skip authentication\u2014exactly the assumption SSRF breaks.\n\n---\n\n## 3. Why Cloud Metadata Endpoints Matter\n\nCloud providers expose an instance metadata service (IMDS) at a **link-local address**:\n\n```\nhttp://169.254.169.254/\n```\n\nOn AWS (IMDSv1), an unauthenticated GET can return temporary IAM credentials:\n\n```\nhttp://169.254.169.254/latest/meta-data/iam/security-credentials/<role>\n```\n\nThese credentials may grant access to S3 buckets, databases, or the ability to spin up resources. SSRF \u2192 metadata access \u2192 **full cloud account compromise** is one of the most damaging real-world chains (e.g., the 2019 Capital One breach).\n\nEquivalent endpoints exist on GCP, Azure, and others.\n\n---\n\n## 4. Common Validation Mistakes\n\nDevelopers often try to blocklist bad destinations and fail:\n\n- **Blocklisting only `127.0.0.1`** \u2014 misses `localhost`, `0.0.0.0`, `[::1]`, `127.0.0.2`, decimal `2130706433`, or octal/hex encodings.\n- **Validating the URL string, not the resolved IP** \u2014 `http://evil.com` may DNS-resolve to `127.0.0.1`.\n- **DNS rebinding** \u2014 validation passes on first resolution, then the attacker's DNS returns an internal IP on the actual fetch (TOCTOU gap).\n- **Ignoring redirects** \u2014 a safe URL responds with `302 \u2192 http://169.254.169.254`.\n- **Allowing dangerous schemes** \u2014 `file://`, `gopher://`, `ftp://`.\n- **Trusting the `Host` header or partial URL parsing** \u2014 parser confusion between validation and fetch libraries.\n- **Allowing IPv6 / IPv4-mapped addresses** to bypass IPv4 checks.\n\n---\n\n## 5. How to Prevent SSRF Securely\n\n**Prefer allowlists over blocklists.** If the feature only needs known providers, allow specific domains/IPs and reject everything else.\n\n**Validate the resolved IP, not just the string:**\n1. Parse the URL with a strict, known parser.\n2. Resolve the hostname to its IP(s).\n3. Reject private, loopback, link-local, and reserved ranges:\n   - `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`\n   - `169.254.0.0/16` (metadata!), `::1`, `fc00::/7`, `fe80::/10`\n4. **Pin the validated IP** and connect to it directly to defeat DNS rebinding (validate-then-use the same address).\n\n**Control the request behavior:**\n- Disable or strictly validate redirects (re-validate each hop).\n- Allow only `http`/`https` schemes.\n- Set timeouts and response size limits.\n\n**Defense in depth:**\n- Enforce **IMDSv2** (requires a session token via PUT header\u2014blocks simple GET-based SSRF), or block `169.254.169.254` at the network layer.\n- Route outbound fetches through an **egress proxy** that enforces allowlists.\n- Apply **network segmentation / firewall egress rules** so the fetching service can't reach internal subnets.\n- Run the fetcher with **minimal IAM permissions**.\n\n**Example validation flow:**\n```python\nimport ipaddress, socket\nfrom urllib.parse import urlparse\n\ndef is_safe_url(url):\n    parsed = urlparse(url)\n    if parsed.scheme not in (\"http\", \"https\"):\n        return False\n    host = parsed.hostname\n    # Resolve and check ALL returned addresses\n    for info in socket.getaddrinfo(host, None):\n        ip = ipaddress.ip_address(info[4][0])\n        if (ip.is_private or ip.is_loopback or\n            ip.is_link_local or ip.is_reserved):\n            return False\n    return True\n# NOTE: still must connect to the pinned IP, not re-resolve,\n# and re-validate any redirects.\n```\n\n---\n\n### Key takeaway\nSSRF exploits the gap between *what the user asked for* and *where the server actually connects*. Secure design closes that gap by validating the **resolved destination**, pinning it through to the actual connection, restricting schemes and redirects, and assuming the network layer is a final safety net\u2014not the only one.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 131,
+    "completion_tokens": 1994,
+    "total_tokens": 2125,
+    "cost": 0.050505,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.050505,
+      "upstream_inference_prompt_cost": 0.000655,
+      "upstream_inference_completions_cost": 0.04985
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:30:26.955768+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "prompt_id": "DET-01-DU",
+  "model": "openai/gpt-5.5-20260423",
+  "text": "## Sigma Rule: PowerShell EncodedCommand Usage\n\n```yaml\ntitle: PowerShell EncodedCommand Parameter Usage\nid: 9f0b3c2e-0a7f-4d3d-8e1e-7e3f7a7a9c31\nstatus: test\ndescription: Detects PowerShell or PowerShell Core processes using -EncodedCommand, -enc, or common abbreviated EncodedCommand parameter forms.\nauthor: ChatGPT\ndate: 2026-06-02\nlogsource:\n  product: windows\n  category: process_creation\n\ndetection:\n  selection_image:\n    Image|endswith:\n      - '\\powershell.exe'\n",
+  "finish_reason": "length",
+  "usage": {
+    "prompt_tokens": 74,
+    "completion_tokens": 4096,
+    "total_tokens": 4170,
+    "cost": 0.12325,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.12325,
+      "upstream_inference_prompt_cost": 0.00037,
+      "upstream_inference_completions_cost": 0.12288
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 3947,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T22:16:50.910590+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "openai/gpt-5.5-20260423",
+    "reasoning": "**Decoding PowerShell Commands**\n\nI'm dealing with a PowerShell EncodedCommand, which is basically a base64 string of a UTF-16LE string. My first step is to collect the full command line, decode it, and take caution not to execute any commands. I can use CyberChef or Python for decoding. I need to look for potentially malicious actions and review any parent processes like browsers or scripts. Also, I should keep an eye on logs for specific events. Lastly, I should consider writing a \"Sigma rule\" and address false positives.**Mapping potential tactics**\n\nI\u2019m considering the potential MITRE mapping in my analysis. It looks like I should include T1059.001 for PowerShell and T1027 for obfuscated/compressed files. If available, I might want to add T1027.010 for command obfuscation, and possibly T1140 for deobfuscating or decoding files or information based on context. I wonder if tags in Sigma, like `attack.t1027.010`, are supported. It seems like these tags can be arbitrary, so I need to finalize my approach."
+  }
+}

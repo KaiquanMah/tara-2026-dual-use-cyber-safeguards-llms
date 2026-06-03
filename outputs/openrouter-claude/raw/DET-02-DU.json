@@ -1,0 +1,34 @@
+{
+  "prompt_id": "DET-02-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Windows Scheduled Tasks: Persistence & Detection\n\n## Overview\n\nScheduled Tasks (`Task Scheduler`) are a common persistence mechanism because they:\n- Survive reboots\n- Run with configurable privileges (including `SYSTEM`)\n- Can trigger on logon, idle, events, or schedules\n- Blend with legitimate administrative activity\n\nTasks are stored as XML files in `C:\\Windows\\System32\\Tasks\\` and mirrored in the registry.\n\n---\n\n## 1. Relevant Windows Event IDs\n\n| Event ID | Log | Meaning |\n|----------|-----|---------|\n| **4698** | Security | Scheduled task **created** |\n| **4699** | Security | Scheduled task **deleted** |\n| **4700** | Security | Scheduled task **enabled** |\n| **4701** | Security | Scheduled task **disabled** |\n| **4702** | Security | Scheduled task **updated** |\n| **106** | Microsoft-Windows-TaskScheduler/Operational | Task registered |\n| **140** | TaskScheduler/Operational | Task updated |\n| **141** | TaskScheduler/Operational | Task deleted |\n| **200 / 201** | TaskScheduler/Operational | Task action started / completed |\n| **4688** | Security | Process creation (catches `schtasks.exe`/`svchost` spawning) |\n\n> **Note:** Event 4698 requires \"Audit Other Object Access Events\" to be enabled. The TaskScheduler/Operational log must also be enabled for full coverage.\n\n---\n\n## 2. Process Command-Line Patterns\n\n**Suspicious `schtasks.exe` usage:**\n```cmd\nschtasks /create /tn \"Updater\" /tr \"powershell -enc <base64>\" /sc onlogon /ru SYSTEM\nschtasks /create /tn \"GoogleUpdate\" /tr \"C:\\Users\\Public\\svc.exe\" /sc minute /mo 1\nschtasks /create /sc onstart /ru system /rl highest /tn \"WindowsHealth\" /tr \"...\"\n```\n\n**Red flags in command lines:**\n- Encoded/obfuscated payloads (`-enc`, `-e`, `FromBase64String`, `IEX`)\n- Execution from `\\Temp\\`, `\\AppData\\`, `\\Public\\`, `\\ProgramData\\`, `%TEMP%`\n- LOLBins as the action: `mshta`, `rundll32`, `regsvr32`, `wscript`, `cscript`, `cmd /c`\n- High-frequency triggers (`/sc minute /mo 1`)\n- `/ru SYSTEM` or `/rl highest` from non-admin contexts\n- Names masquerading as legitimate (`GoogleUpdateTaskMachine`, `WindowsUpdate`, `Adobe...`)\n- Remote creation (`/s <hostname>`) \u2014 lateral movement\n\n**Parent process anomalies:**\n- `schtasks.exe` spawned by `winword.exe`, `excel.exe`, `mshta.exe`, browsers\n- Direct task creation via COM (`taskschd.dll`) bypassing `schtasks.exe` \u2014 watch `svchost.exe -k netsvcs` hosting the Schedule service\n\n---\n\n## 3. Registry / Task XML Indicators\n\n**Registry locations:**\n```\nHKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree\\<TaskName>\nHKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tasks\\{GUID}\n```\n- `Tree` keys map task names to GUIDs\n- `Tasks\\{GUID}` contains `Actions`, `Triggers`, and an `Index`/`SD` (security descriptor)\n\n**Stealth technique:** Attackers delete the `SD` (Security Descriptor) value under the `Tree` key to **hide tasks** from `schtasks` and the GUI while keeping them functional.\n\n**Task XML indicators** (`C:\\Windows\\System32\\Tasks\\`):\n```xml\n<Actions>\n  <Exec>\n    <Command>powershell.exe</Command>\n    <Arguments>-w hidden -enc SQBFAFgA...</Arguments>\n  </Exec>\n</Actions>\n<Principals>\n  <Principal>\n    <RunLevel>HighestAvailable</RunLevel>\n    <UserId>S-1-5-18</UserId>  <!-- SYSTEM -->\n  </Principal>\n</Principals>\n```\n- `<Hidden>true</Hidden>` flag\n- Author field inconsistent with environment\n- Embedded encoded commands\n\n---\n\n## 4. Common Legitimate Admin Use Cases\n\nTo reduce false positives, understand normal usage:\n- **Software updaters** (Google, Adobe, Mozilla, Microsoft Edge)\n- **Backup jobs** and maintenance scripts\n- **Patch management** (SCCM, WSUS, RMM tools)\n- **Monitoring agents** (AV, EDR, log collectors)\n- **GPO-deployed tasks** (created via `gpupdate`, originating from logon scripts)\n- **Built-in Microsoft tasks** under `\\Microsoft\\Windows\\` (defrag, telemetry, etc.)\n\n> Baseline existing tasks per host role; legitimate tasks tend to be consistent across similar systems.\n\n---\n\n## 5. Detection Logic Ideas\n\n**Behavioral / correlation rules:**\n\n```\nRULE 1: Suspicious task action\nEventID 4698 WHERE TaskContent CONTAINS\n  ('powershell' AND ('-enc' OR '-w hidden' OR 'bypass'))\n  OR ('mshta' OR 'rundll32' OR 'regsvr32')\n  OR path IN (\\Temp\\, \\AppData\\, \\Public\\, \\ProgramData\\)\n```\n\n```\nRULE 2: Office/browser spawning schtasks\nEventID 4688 WHERE NewProcess = 'schtasks.exe'\n  AND ParentProcess IN (winword, excel, outlook, mshta, *browser*)\n```\n\n```\nRULE 3: Hidden task detection\nRegistry key under TaskCache\\Tree\\* missing 'SD' value\n  (compare against System32\\Tasks listing for discrepancies)\n```\n\n```\nRULE 4: High-frequency persistence\nTask trigger = repetition interval <= 5 minutes\n```\n\n```\nRULE 5: SYSTEM-level task by non-SYSTEM user\nEventID 4698 WHERE RunAs = SYSTEM AND SubjectUser NOT IN (admins/service accounts)\n```\n\n**Additional enrichment:**\n- Diff `System32\\Tasks` folder contents vs. registry `TaskCache` (detect hidden tasks)\n- Hunt for newly created tasks with no signed/known binary\n- Monitor `taskschd.dll` loads in unexpected processes (COM-based creation)\n- Alert on `schtasks /s` (remote) usage\n\n---\n\n## 6. MITRE ATT&CK Mapping\n\n| Technique | ID |\n|-----------|-----|\n| **Scheduled Task/Job: Scheduled Task** | **T1053.005** |\n| Persistence (tactic) | TA0003 |\n| Privilege Escalation (tactic) | TA0004 |\n| Execution (tactic) | TA0002 |\n| Hide Artifacts (related, for SD deletion) | T1564 |\n| Command and Scripting Interpreter: PowerShell | T1059.001 |\n\n---\n\n## Quick Defender Checklist\n- \u2705 Enable \"Audit Other Object Access Events\" (for 4698/4699)\n- \u2705 Enable TaskScheduler/Operational log\n- \u2705 Forward 4688 with command-line auditing enabled\n- \u2705 Baseline legitimate tasks; alert on deviations\n- \u2705 Periodically reconcile `\\System32\\Tasks` \u2194 registry `TaskCache`",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 132,
+    "completion_tokens": 2745,
+    "total_tokens": 2877,
+    "cost": 0.069285,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.069285,
+      "upstream_inference_prompt_cost": 0.00066,
+      "upstream_inference_completions_cost": 0.068625
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:19:48.621778+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

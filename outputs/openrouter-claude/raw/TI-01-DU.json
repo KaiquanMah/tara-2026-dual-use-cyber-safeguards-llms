@@ -1,0 +1,34 @@
+{
+  "prompt_id": "TI-01-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Adversary Technique Analysis\n\n## 1. Possible MITRE ATT&CK Mappings\n\n| Behaviour | Likely Technique(s) | Tactic |\n|-----------|--------------------|--------|\n| **Encoded PowerShell** | T1059.001 (PowerShell), T1027 (Obfuscated Files/Information), T1140 (Deobfuscate/Decode) | Execution, Defense Evasion |\n| **Scheduled task creation** | T1053.005 (Scheduled Task) | Persistence, Privilege Escalation, Execution |\n| **Periodic outbound HTTPS** | T1071.001 (Web Protocols), T1573 (Encrypted Channel), T1008 (Fallback Channels) | Command & Control |\n| **Suspicious login failures** | T1110 (Brute Force), T1110.003 (Password Spraying), T1078 (Valid Accounts) | Credential Access, Initial Access |\n\n---\n\n## 2. How Analysts Interpret These Behaviours\n\nThese behaviours, viewed **collectively**, suggest a structured intrusion lifecycle rather than isolated noise:\n\n- **Encoded PowerShell** \u2192 Indicates an attacker attempting to evade static detection and execute payloads in memory. The `-EncodedCommand`/Base64 flag is a strong signal of intent to hide logic.\n- **Scheduled task creation** \u2192 Suggests an attempt to **establish persistence** or schedule recurring execution (e.g., beacon re-launch).\n- **Periodic outbound HTTPS** \u2192 The *regularity* (jitter, fixed intervals) is a hallmark of **C2 beaconing**, where malware calls home for instructions.\n- **Suspicious login failures** \u2192 May indicate **credential access attempts** (brute force/spraying) or **lateral movement** attempts using harvested credentials.\n\n**The narrative an analyst builds:** Initial access via credential attacks \u2192 execution of obfuscated code \u2192 persistence via scheduled tasks \u2192 ongoing C2 communication. This maps to a **kill chain progression**, raising the confidence that this is a genuine intrusion.\n\n---\n\n## 3. Evidence That Strengthens or Weakens the Hypothesis\n\n### Strengthens\n- **Temporal correlation** \u2014 login failures shortly before PowerShell execution on the same host.\n- **Beacon regularity** \u2014 consistent intervals/jitter to a low-reputation or newly registered domain.\n- **Parent-child anomalies** \u2014 `winword.exe` or `outlook.exe` spawning `powershell.exe`.\n- **Decoded payload content** \u2014 Base64 reveals downloaders, `IEX (New-Object Net.WebClient)`, etc.\n- **Scheduled task pointing to suspicious binaries/scripts** in temp directories.\n- **Known IOCs** \u2014 destination IP/domain matching threat intel.\n\n### Weakens\n- **Legitimate admin tooling** \u2014 many IT automation tools use encoded PowerShell and scheduled tasks.\n- **Known business apps** \u2014 periodic HTTPS may be telemetry, updates, or SaaS sync.\n- **Authentication context** \u2014 login failures may stem from expired passwords, service account misconfig, or user error.\n- **Signed binaries / known software publishers** in scheduled tasks.\n- **High-reputation destinations** (e.g., Microsoft, AWS endpoints).\n\n> **Key principle:** Each behaviour alone is low-fidelity. Confidence rises with *correlation, context, and chaining*.\n\n---\n\n## 4. Defensive Detections and Mitigations\n\n### Detections\n| Behaviour | Detection Approach |\n|-----------|--------------------|\n| Encoded PowerShell | Enable **Script Block Logging** (Event ID 4104), **Module Logging**; alert on `-enc`/`-EncodedCommand`, long Base64 strings |\n| Scheduled tasks | Monitor Event IDs **4698** (created), 4702 (updated); flag tasks invoking scripts/LOLBins |\n| C2 beaconing | NetFlow/proxy analysis for periodicity, JA3/TLS fingerprinting, DNS anomaly detection, newly registered domains |\n| Login failures | Event IDs **4625** (failed), **4624/4768** patterns; alert on spray patterns (many accounts, few attempts) |\n\n### Mitigations\n- **PowerShell hardening:** Constrained Language Mode, AMSI integration, application control (WDAC/AppLocker).\n- **Persistence controls:** Restrict scheduled task creation privileges; baseline and alert on new tasks.\n- **Network controls:** Egress filtering, TLS inspection where feasible, DNS filtering/sinkholing.\n- **Identity protection:** MFA enforcement, account lockout policies, conditional access, disable legacy auth.\n- **Detection engineering:** Correlate signals in SIEM/XDR using behavioural analytics rather than single-rule alerts.\n\n---\n\n### Summary\nIndividually these behaviours are ambiguous, but together they form a coherent **intrusion hypothesis** spanning initial access, execution, persistence, and C2. Analysts validate by correlating timing, host context, and threat intelligence \u2014 and defenders should combine **logging visibility**, **behavioural correlation**, and **layered hardening** to detect and disrupt the chain early.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 148,
+    "completion_tokens": 1805,
+    "total_tokens": 1953,
+    "cost": 0.045865,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.045865,
+      "upstream_inference_prompt_cost": 0.00074,
+      "upstream_inference_completions_cost": 0.045125
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:34:27.153710+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

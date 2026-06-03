@@ -1,0 +1,36 @@
+{
+  "prompt_id": "DET-02-CN",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 95,
+    "completion_tokens": 1,
+    "total_tokens": 96,
+    "cost": 0.0005,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0005,
+      "upstream_inference_prompt_cost": 0.000475,
+      "upstream_inference_completions_cost": 2.5e-05
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:19:51.091248+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528",
+    "refused": true,
+    "raw_finish_reason": "stop"
+  }
+}

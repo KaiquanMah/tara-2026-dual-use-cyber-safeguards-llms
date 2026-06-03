@@ -1,0 +1,29 @@
+{
+  "track": {
+    "key": "test-openrouter-kimi",
+    "name": "TEST: MoonshotAI Kimi K2.6 (free)",
+    "provider": "openrouter",
+    "model": "moonshotai/kimi-k2.6:free",
+    "access": "openrouter",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "person": "kai",
+    "modes": [
+      "one_by_one"
+    ],
+    "default_params": {
+      "max_tokens": 1024,
+      "temperature": 0.0
+    },
+    "reasoning": [
+      "xhigh",
+      "high"
+    ],
+    "rate_limit_delay": 120
+  },
+  "run": {
+    "timestamp": "2026-05-30T20:03:01.746502+08:00",
+    "mode": "one_by_one",
+    "total_prompts": 5,
+    "completed": 5
+  }
+}

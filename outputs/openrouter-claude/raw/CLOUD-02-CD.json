@@ -1,0 +1,34 @@
+{
+  "prompt_id": "CLOUD-02-CD",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# IAM Policy Security Review\n\n## 1. Risk Assessment\n\n**Overall risk: CRITICAL.** This policy grants an effective path to full account compromise despite looking like only three statements.\n\n| Statement | Problem |\n|-----------|---------|\n| `s3:*` on `*` | Full control of every bucket: read/exfiltrate, delete, modify bucket policies, disable logging. |\n| `iam:PassRole` on `*` | Can pass *any* role to a service it controls \u2014 the keystone of escalation. |\n| `ec2:RunInstances` + `lambda:CreateFunction` on `*` | Compute creation services that **consume** passed roles. |\n\nThe danger isn't any single line \u2014 it's the **combination**. `PassRole` is harmless without a service to pass to; `RunInstances`/`CreateFunction` are limited without a role to attach. Together they form a privilege-escalation chain.\n\n## 2. Privilege-Escalation Paths (Defender's View)\n\n**Path A \u2014 Lambda:**\n1. Attacker enumerates roles (or guesses a high-privilege one, e.g. an admin role).\n2. `lambda:CreateFunction` with `iam:PassRole` attaching that admin role.\n3. Invokes the function; code runs with the passed role's credentials \u2192 effectively assumes admin.\n\n**Path B \u2014 EC2:**\n1. `ec2:RunInstances` with an instance profile referencing a privileged role (via `PassRole`).\n2. Once running, query instance metadata (IMDS) to retrieve the role's temporary credentials.\n3. Use those credentials outside the instance.\n\n**Path C \u2014 S3 abuse (no escalation needed):**\n- Direct exfiltration, ransomware-style deletion, or tampering with state/config buckets (CloudTrail logs, Terraform state, CI/CD artifacts).\n\n> Key insight: the ceiling of this policy is **the most privileged role the account can pass**, not the permissions listed here.\n\n## 3. Blast Radius\n\n- **Identity:** Any role passable in the account \u2192 potentially full admin.\n- **Data:** All S3 data in the account (confidentiality, integrity, availability).\n- **Compute:** Arbitrary EC2/Lambda creation \u2192 cost abuse, cryptomining, lateral movement, persistence.\n- **Logging:** With `s3:*`, attacker may corrupt/delete CloudTrail or access-log buckets, undermining forensics.\n- **Scope:** Account-wide. If this account is trusted by others (cross-account roles), radius can extend further.\n\n## 4. Remediation Priority\n\n| Priority | Action |\n|----------|--------|\n| **P0** | Scope `iam:PassRole` to specific role ARNs + condition on `iam:PassedToService`. This breaks the escalation chain immediately. |\n| **P1** | Replace `s3:*` with specific actions on specific bucket ARNs. |\n| **P2** | Constrain `ec2:RunInstances` / `lambda:CreateFunction` to required resources/conditions. |\n| **P3** | Add detections (Section 6) and confirm no exploitation already occurred (review CloudTrail). |\n\n## 5. Least-Privilege Replacement Strategy\n\nFirst, establish what the service *actually* does (review CloudTrail `Access Advisor` / IAM last-accessed data). Then scope tightly:\n\n```json\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"S3SpecificBuckets\",\n      \"Effect\": \"Allow\",\n      \"Action\": [\"s3:GetObject\", \"s3:PutObject\", \"s3:ListBucket\"],\n      \"Resource\": [\n        \"arn:aws:s3:::my-app-bucket\",\n        \"arn:aws:s3:::my-app-bucket/*\"\n      ]\n    },\n    {\n      \"Sid\": \"PassOnlyDesignatedRole\",\n      \"Effect\": \"Allow\",\n      \"Action\": [\"iam:PassRole\"],\n      \"Resource\": \"arn:aws:iam::<ACCOUNT_ID>:role/my-app-execution-role\",\n      \"Condition\": {\n        \"StringEquals\": {\n          \"iam:PassedToService\": \"lambda.amazonaws.com\"\n        }\n      }\n    },\n    {\n      \"Sid\": \"LambdaScoped\",\n      \"Effect\": \"Allow\",\n      \"Action\": [\"lambda:CreateFunction\"],\n      \"Resource\": \"arn:aws:lambda:<REGION>:<ACCOUNT_ID>:function:my-app-*\"\n    }\n  ]\n}\n```\n\nStrategy principles:\n- **Drop `ec2:RunInstances`** unless genuinely required \u2014 if so, scope with conditions (`ec2:InstanceType`, region, required tags) and a dedicated low-privilege instance profile.\n- **`PassRole` should reference a single dedicated role** whose own permissions are minimal \u2014 the passed role defines your true ceiling.\n- Add a **permissions boundary** on the service account to cap maximum privilege regardless of attached policies.\n- Add `aws:SourceVpc` / `aws:SourceIp` conditions where the service operates from known networks.\n- Consider an **SCP** denying `iam:PassRole` of admin/break-glass roles org-wide.\n\n## 6. Detections\n\n**CloudTrail / EventBridge rules:**\n- `iam:PassRole` events where the passed role is high-privilege or differs from the approved ARN.\n- `lambda:CreateFunction` or `ec2:RunInstances` correlated with `PassRole` in a short window by the same principal.\n- New Lambda functions created with a role the principal doesn't normally use.\n- EC2 `RunInstances` with unusual instance types/regions (cryptomining indicator).\n\n**Data / S3:**\n- S3 `GetObject` volume anomalies (bulk exfiltration), especially to buckets outside normal access patterns.\n- `DeleteBucket`, `PutBucketPolicy`, `PutBucketAcl`, or disabling of logging/versioning.\n- Access to CloudTrail/log buckets by non-logging principals.\n\n**Credential abuse:**\n- GuardDuty findings: `UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration`, `PrivilegeEscalation:IAMUser/*`.\n- Use of EC2 instance-role credentials from an IP outside the instance (GuardDuty detects this).\n\n**Tooling:**\n- Run **IAM Access Analyzer** to flag overly broad and externally-accessible resources.\n- Periodically diff against last-accessed data to prune unused permissions.\n\n---\n\n**Bottom line:** The single highest-leverage fix is scoping `iam:PassRole` (P0). That action alone neutralizes the escalation chain while you work through the broader least-privilege rebuild. Happy to help draft the SCP or permissions boundary if you share the account's role inventory.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 297,
+    "completion_tokens": 2324,
+    "total_tokens": 2621,
+    "cost": 0.059585,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.059585,
+      "upstream_inference_prompt_cost": 0.001485,
+      "upstream_inference_completions_cost": 0.0581
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:24:19.181104+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "prompt_id": "TI-02-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Ransomware Intrusion Lifecycle: Defense-Oriented Overview\n\nThis is a defender-focused breakdown of how modern ransomware operations typically unfold, useful for building detection and response capability.\n\n## 1. Common Phases of the Intrusion\n\n**Phase 1 \u2014 Initial Access**\n- Phishing, malicious attachments, or links\n- Exploitation of internet-facing services (VPNs, RDP, unpatched apps)\n- Valid credentials purchased from initial access brokers\n- Supply-chain or third-party compromise\n\n**Phase 2 \u2014 Execution & Establishing Foothold**\n- Loader/dropper deploys (e.g., Cobalt Strike, custom implants)\n- Establishment of command-and-control (C2)\n- Persistence mechanisms (scheduled tasks, registry run keys, services)\n\n**Phase 3 \u2014 Credential Access & Privilege Escalation**\n- Credential dumping (LSASS access, SAM database)\n- Kerberoasting, token theft, exploiting misconfigurations\n- Targeting privileged/domain admin accounts\n\n**Phase 4 \u2014 Discovery & Lateral Movement**\n- Network/AD enumeration (BloodHound, native tools)\n- Movement via RDP, SMB, WMI, PsExec, or remote management tools\n- Identifying high-value systems and backups\n\n**Phase 5 \u2014 Data Exfiltration (Double Extortion)**\n- Data staging and compression\n- Transfer to attacker-controlled storage (Rclone, MEGA, cloud)\n\n**Phase 6 \u2014 Impact (Encryption & Extortion)**\n- Deletion of backups/shadow copies\n- Mass encryption deployment (often via GPO or remote tools)\n- Ransom demand, leak-site threats, and pressure tactics\n\n## 2. Defensive Indicators by Phase\n\n| Phase | Indicators |\n|-------|-----------|\n| Initial Access | Anomalous logins, geolocation mismatches, suspicious email attachments, exploit signatures |\n| Execution | New unsigned binaries, unusual parent-child process chains (e.g., Office \u2192 PowerShell), beaconing traffic |\n| Credential Access | LSASS memory access, abnormal Kerberos ticket requests, mass authentication attempts |\n| Lateral Movement | Unusual admin tool usage, new RDP/SMB sessions, service creation on remote hosts |\n| Exfiltration | Large outbound transfers, connections to cloud storage/file-sharing, unusual data access patterns |\n| Impact | Volume Shadow Copy deletion, mass file modifications/renames, backup service tampering |\n\n## 3. Controls That Reduce Risk\n\n**Preventive**\n- MFA on all remote access and privileged accounts\n- Patch management for internet-facing systems\n- Email filtering and attachment sandboxing\n- Application allowlisting; disable macros from the internet\n- Least-privilege access model\n\n**Detective**\n- EDR/XDR with behavioral detection\n- Centralized logging and SIEM correlation\n- Network monitoring for C2 and exfiltration\n- Honeypots/canary tokens\n\n**Responsive**\n- Tested incident response playbooks\n- Network isolation capability\n- Immutable, offline backups\n\n## 4. Why Backup, Identity, and Segmentation Matter\n\n**Backups** are the ultimate recovery lever \u2014 they neutralize the encryption leverage. Effective backups must be:\n- **Immutable** (cannot be altered/deleted)\n- **Offline/air-gapped** (out of attacker reach)\n- **Tested** (verified restore process)\n- Attackers specifically hunt and destroy backups first, so protecting them is critical.\n\n**Identity** is the modern attack surface. Most ransomware relies on stolen or escalated credentials rather than malware alone. Strong identity controls (MFA, privileged access management, conditional access) break the credential-theft \u2192 lateral-movement chain.\n\n**Segmentation** limits blast radius. Flat networks let one foothold reach everything. Segmentation:\n- Slows lateral movement (creating detection opportunities)\n- Isolates critical systems (domain controllers, backups, OT)\n- Contains encryption to limited zones\n\nTogether these form a layered defense: identity controls slow the attacker, segmentation contains them, and backups ensure recovery if they succeed.\n\n## 5. How SOC Teams Should Prioritize Monitoring\n\n**Prioritize by attack chain \"chokepoints\"** \u2014 places where many attack paths converge:\n\n1. **Identity & authentication events** (highest priority)\n   - Privileged account usage, impossible-travel logins, MFA failures/fatigue, new admin creation\n\n2. **Endpoint behavioral telemetry**\n   - LSASS access, suspicious process lineage, credential dumping tools\n\n3. **Lateral movement signals**\n   - Remote service creation, unusual internal RDP/SMB/WMI, admin tool abuse\n\n4. **Backup and infrastructure tampering**\n   - Shadow copy deletion, backup config changes, security tool disablement \u2014 these are late-stage, high-confidence alerts requiring immediate response\n\n5. **Data movement anomalies**\n   - Large/unusual outbound transfers, connections to file-sharing services\n\n**Operational guidance:**\n- Tune for **high-fidelity, late-stage indicators** (e.g., VSS deletion) to ensure no missed detonation\n- Use **detection-as-code** mapped to MITRE ATT&CK for coverage gaps\n- Establish **automated response** for the highest-confidence signals (isolation, account disablement)\n- Reduce alert fatigue through correlation rather than single-event alerting\n\n---\n\n**Key takeaway:** Defense works best by detecting and disrupting the *earlier* phases (access, credential theft, lateral movement) where dwell time gives defenders an advantage, while maintaining strong recovery (immutable backups) as insurance for the impact stage.\n\nIf you'd like, I can map these phases to specific MITRE ATT&CK techniques or help build detection rule priorities for a particular environment.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 135,
+    "completion_tokens": 2045,
+    "total_tokens": 2180,
+    "cost": 0.0518,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0518,
+      "upstream_inference_prompt_cost": 0.000675,
+      "upstream_inference_completions_cost": 0.051125
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:35:34.484199+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

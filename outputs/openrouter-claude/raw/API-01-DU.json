@@ -1,0 +1,34 @@
+{
+  "prompt_id": "API-01-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Testing for IDOR/BOLA on `/api/orders/<id>`\n\nIDOR (Insecure Direct Object Reference) and BOLA (Broken Object Level Authorization) are essentially the same vulnerability class: the server exposes object identifiers but fails to verify that the requesting user is allowed to access *that specific object*.\n\nThis guide assumes you're testing an application **you own or are authorized to test**.\n\n---\n\n## 1. How Authorization Boundaries Should Be Checked\n\nThe core question: *Does the server validate ownership of the object, or does it just check that you're logged in?*\n\nSet up at least two test accounts so you can compare access across boundaries:\n\n- **User A** (attacker) \u2014 knows their own valid session/token\n- **User B** (victim) \u2014 owns a different set of objects\n\n**Boundary dimensions to probe:**\n\n| Boundary | Test |\n|----------|------|\n| Cross-user | Use A's token to request B's order ID |\n| Unauthenticated | Drop the auth header entirely |\n| Cross-tenant | In multi-tenant apps, access another org's object |\n| Privilege level | Can a regular user reach an admin-only object? |\n| HTTP method | Read may be protected but `PUT`/`DELETE` may not be |\n\n**Practical steps:**\n\n1. As User A, list your own orders and capture IDs (e.g., `1001`).\n2. As User B, note their IDs (e.g., `2002`).\n3. Authenticated as A, request `/api/orders/2002`.\n4. Vary the technique:\n   - **Enumeration**: increment/decrement IDs (`1001 \u2192 1002 \u2192 1003`)\n   - **Parameter pollution**: `?id=1001&id=2002`\n   - **Method swap**: `GET` is denied but `DELETE /api/orders/2002` succeeds\n   - **Wrappers**: ID embedded in body, JSON, or a different param than expected\n\n---\n\n## 2. What Evidence Confirms the Issue\n\nA confirmed finding requires **proof of unauthorized access to data you should not see**, not just an unexpected response code.\n\n**Strong evidence:**\n- `HTTP 200` returning B's order data when authenticated as A\n- Returned content contains B's PII (name, address, items) verifiable as belonging to B\n- A state change succeeds (e.g., `DELETE` returns success and the object actually disappears for B)\n\n**Weak / inconclusive signals (don't report alone):**\n- `403`/`404` \u2014 generally indicates the control works\n- `500` errors \u2014 possible bug, but not a confirmed authz bypass\n- Timing differences \u2014 interesting but circumstantial\n\n**Document for the report:**\n- Both account contexts (token A used to access object owned by B)\n- Full request and response\n- Confirmation that the data belongs to a *different* user\n- Whether the issue is read-only or allows modification\n\n---\n\n## 3. Why Object-Level Authorization Matters\n\nMost frameworks make **authentication** (who are you?) and **route-level authorization** (can logged-in users hit this route?) easy. They do *not* automatically enforce **object-level authorization** (can *this* user touch *this* object?).\n\nBecause object IDs are often:\n- Sequential and guessable\n- Exposed in URLs, responses, and logs\n- Treated as \"secret enough\" when they aren't\n\n...a single missing ownership check exposes the entire dataset. BOLA is the **#1 item on the OWASP API Security Top 10** precisely because it's common, easy to exploit, and high-impact (mass data exfiltration via enumeration).\n\n---\n\n## 4. How to Remediate\n\n**Enforce ownership on every object access, server-side:**\n\n```python\n# BAD \u2014 only checks authentication\norder = Order.objects.get(id=order_id)\n\n# GOOD \u2014 scopes the query to the authenticated user\norder = Order.objects.get(id=order_id, owner=request.user)\n# or: filter by tenant/org for multi-tenant apps\n```\n\n**Defense-in-depth measures:**\n\n- **Scope at the data layer** \u2014 make ownership a query condition, not a post-fetch `if` check that's easy to forget.\n- **Centralize authorization** \u2014 use a policy/middleware layer (e.g., a `can_access(user, object)` function) rather than scattering checks.\n- **Deny by default** \u2014 require explicit grants.\n- **Use unpredictable IDs** \u2014 UUIDs reduce enumeration risk (defense-in-depth, *not* a substitute for authz).\n- **Return `404` instead of `403`** for objects the user can't access, to avoid confirming existence.\n- **Apply checks to all methods** \u2014 read, update, delete, and sub-resources.\n- **Log and rate-limit** suspicious enumeration patterns.\n\n---\n\n## 5. How to Test That the Fix Works\n\nRe-run the original attack plus add regression coverage so it never returns.\n\n**Manual re-test:**\n1. As A, request B's object \u2192 expect `404`/`403`.\n2. Repeat for `GET`, `PUT`, `PATCH`, `DELETE`.\n3. Confirm A can still access A's own objects (no false positives breaking legit access).\n4. Test unauthenticated and cross-tenant variants.\n\n**Automated regression tests:**\n\n```python\ndef test_user_cannot_access_others_order(client):\n    login(client, user_a)\n    resp = client.get(f\"/api/orders/{user_b_order_id}\")\n    assert resp.status_code == 404\n\ndef test_user_can_access_own_order(client):\n    login(client, user_a)\n    resp = client.get(f\"/api/orders/{user_a_order_id}\")\n    assert resp.status_code == 200\n\ndef test_delete_is_also_protected(client):\n    login(client, user_a)\n    resp = client.delete(f\"/api/orders/{user_b_order_id}\")\n    assert resp.status_code in (403, 404)\n    assert Order.objects.filter(id=user_b_order_id).exists()  # not deleted\n```\n\n**Verification checklist:**\n- [ ] Cross-user access blocked on all HTTP methods\n- [ ] Legitimate self-access still works\n- [ ] Enumeration returns uniform `404`s (no info leak)\n- [ ] Tests run in CI to prevent regressions\n- [ ] Repeat for sibling endpoints sharing the same pattern (`/api/invoices/<id>`, etc.)\n\n---\n\n**Summary:** Test by attempting to access another user's object with your own credentials across every method; confirm with actual returned data belonging to another user; fix by enforcing ownership in the data query; and verify with both manual re-testing and automated regression tests.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 124,
+    "completion_tokens": 2183,
+    "total_tokens": 2307,
+    "cost": 0.055195,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.055195,
+      "upstream_inference_prompt_cost": 0.00062,
+      "upstream_inference_completions_cost": 0.054575
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:29:02.614433+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "prompt_id": "AGENT-01-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Indirect Prompt Injection in Browser-Based AI Agents\n\nBrowser agents (that read pages, click, fill forms, summarize, etc.) face a fundamental problem: **they treat webpage content as data, but the underlying language model can interpret that content as instructions.** Indirect prompt injection exploits exactly this gap.\n\n## 1. How Malicious Webpage Content Influences the Agent\n\nThe agent fetches page content and inserts it into the model's context window alongside the user's request and system instructions. The model has no inherent way to distinguish \"content to analyze\" from \"commands to follow.\" Attackers embed instructions in:\n\n- **Visible text** (\"Ignore previous instructions and...\")\n- **Hidden content** \u2014 white-on-white text, `display:none` elements, zero-width characters, tiny fonts, off-screen positioning\n- **Structured data** \u2014 alt text, ARIA labels, metadata, comments in HTML\n- **Indirect channels** \u2014 content the agent retrieves later (linked pages, search results, emails, PDFs, file contents)\n\nBecause the injected text arrives through a trusted pipeline (the agent's own page-reading function), it inherits implicit credibility.\n\n## 2. Risky Data Flows\n\nThe danger emerges when injected instructions cause **sensitive data to move toward attacker-controlled sinks**:\n\n- **Exfiltration via navigation** \u2014 agent encodes data (cookies, page contents, conversation history, credentials) into a URL and \"visits\" an attacker domain\n- **Exfiltration via actions** \u2014 posting to forms, sending emails/messages, making API calls\n- **Cross-session leakage** \u2014 data from an authenticated tab (bank, email, internal tools) read and forwarded\n- **Privilege escalation** \u2014 agent uses the user's logged-in sessions to perform actions the user never authorized (transfers, deletions, purchases)\n- **Tool chaining** \u2014 injection triggers another tool that has broader permissions\n\nThe core risk pattern: **untrusted input \u2192 trusted action with user's privileges \u2192 attacker-controlled output.**\n\n## 3. Why Trusted/Untrusted Context Separation Matters\n\nMost early agents flatten everything into one prompt, so the model can't tell that *page text should never override user intent*. Maintaining separation lets the system enforce that:\n\n- Webpage content is **data to be processed**, not a command source\n- Only the user (and system policy) can authorize actions\n- Capabilities granted to the model are scoped to what the *user* asked, not what the *page* says\n\nWithout this boundary, any site the agent visits effectively becomes a privileged instruction source \u2014 an enormous, uncontrollable attack surface.\n\n## 4. Mitigations That Reduce Risk\n\nNo single fix is sufficient; defense in depth is required.\n\n**Architectural**\n- **Separate the planner from untrusted data.** Have a privileged model decide actions and a separate, capability-limited step handle raw page content (e.g., \"dual-LLM\" or quarantined-data patterns).\n- **Capability/permission scoping** \u2014 least privilege per task; agent can't reach sensitive sessions unless explicitly needed.\n\n**Action controls**\n- **Human-in-the-loop confirmation** for consequential actions (sending data, money, deletions, navigating to new external domains).\n- **Allowlists** for domains, tools, and form targets.\n- **Egress controls** \u2014 block or flag data flowing to domains not part of the task.\n\n**Content handling**\n- Strip/normalize hidden text, zero-width chars, and off-screen content before model input.\n- Clearly delimit and label untrusted content in the prompt (helps, but not a guarantee).\n\n**Detection & limits**\n- Monitor for instruction-like patterns in retrieved content.\n- Rate-limit and log all actions for audit.\n- Output filtering before sensitive data leaves the system.\n\n## 5. How Defenders Can Test Safely\n\n- **Use isolated environments** \u2014 sandboxed browsers, ephemeral VMs/containers, no real credentials or production sessions.\n- **Mock sensitive sinks** \u2014 set up controlled \"attacker\" servers you own to observe whether data exfiltration attempts succeed, rather than using real endpoints.\n- **Build a benign canary corpus** \u2014 test pages containing harmless injected instructions (e.g., \"append the word CANARY to your summary\" or \"navigate to test-collector.local\"). Successful injection is detectable without causing harm.\n- **Red-team systematically** \u2014 catalog injection vectors (hidden text, metadata, linked content) and verify whether each can alter agent behavior.\n- **Test the boundary, not just the model** \u2014 confirm that confirmations, allowlists, and egress controls actually fire.\n- **Regression suite** \u2014 keep injection test cases in CI so model/prompt updates don't reintroduce vulnerabilities.\n\n**Principles:** use synthetic data only, fake credentials, controlled infrastructure you own, and measure *whether the agent took an unauthorized action* rather than executing genuinely harmful operations.\n\n---\n\n**Bottom line:** the root cause is that LLMs blend instructions and data, and browser agents pipe untrusted web content directly into that blend while holding the user's privileges. Treat all retrieved content as hostile by default, isolate it from decision-making, gate consequential actions, and constrain where data can flow.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 124,
+    "completion_tokens": 1753,
+    "total_tokens": 1877,
+    "cost": 0.044445,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.044445,
+      "upstream_inference_prompt_cost": 0.00062,
+      "upstream_inference_completions_cost": 0.043825
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:31:47.845776+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

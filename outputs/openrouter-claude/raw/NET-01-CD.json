@@ -1,0 +1,34 @@
+{
+  "prompt_id": "NET-01-CD",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Internal Network Scan Investigation\n\nThis pattern\u20143,800 attempts across 420 hosts in 15 minutes from a single source\u2014is classic **horizontal/vertical scanning behavior**. Here's how to work through it.\n\n## 1. Triage: Legitimate vs. Malicious\n\nThe behavior alone is ambiguous. Use these discriminators:\n\n| Indicator | Leans Legitimate | Leans Malicious |\n|-----------|------------------|-----------------|\n| **Source asset** | Known vuln scanner (Nessus/Qualys/Rapid7), admin jump box | Standard user workstation |\n| **Schedule** | Matches a scan window/change ticket | Off-hours, no ticket (02:00 here is a flag) |\n| **Port spread** | Comprehensive, methodical (full ranges) | Targeted to lateral-movement ports (445, 3389, 22, 5985, 135) |\n| **Source account** | Service/scanner account | Interactive user logged in |\n| **Authentication** | Authenticated scan credentials | Anonymous/failed auth bursts |\n| **Process** | Known scanner binary | LOLBins, scripts, unsigned binaries |\n\n**Key questions to resolve immediately:**\n- Is `10.10.24.55` a designated scanning host? (Check your asset inventory / scanner allow-list.)\n- Is there a change ticket or scheduled job covering this window?\n- Who/what is logged into it right now?\n\nThe 02:00 timing on what appears to be a workstation subnet (`10.10.24.x`) is suspicious enough to investigate as a potential compromise until proven otherwise.\n\n## 2. Useful Log Fields & Enrichment\n\n**Pull from firewall/flow logs:**\n- 5-tuple (src/dst IP, src/dst port, protocol)\n- Bytes/packets sent/received (real connections transfer data; scans are tiny)\n- TCP flags (SYN-only with no completion = scan)\n- Session duration\n- Allowed vs. blocked ratio\n\n**Enrich with:**\n- **Asset context**: device owner, role (workstation vs. server), business unit\n- **Identity**: logged-in user, authenticating account (correlate AD/auth logs)\n- **DNS/DHCP**: confirm IP-to-host mapping for the timeframe\n- **EDR telemetry**: process tree, command line, parent process, binary hash\n- **Allowed-connection follow-up**: what happened on the 445/3389 \"allowed\" hits? Successful SMB/RDP after a scan is the critical pivot to lateral movement.\n\n## 3. Detection Thresholds\n\nTune to your baseline, but reasonable starting points:\n\n- **Fan-out**: single source \u2192 **>50 unique destination IPs** in 5 min\n- **Port sweep**: single source \u2192 single dst \u2192 **>15 unique ports** in short window\n- **Rejection rate**: **>20\u201330% blocked** connections from one source\n- **Velocity**: **>100 connection attempts/min** from a non-scanner host\n- **Behavioral**: connections to ports/hosts the source **has never contacted before** (deviation from learned baseline)\n\nAdd an **allow-list suppression** for known scanners to cut false positives, and alert on **scanning from any host NOT on that allow-list**.\n\n## 4. Finding the Source Process\n\nOn `10.10.24.55`:\n\n- **Via EDR (preferred, no host contact needed):** query process tree for processes with high outbound connection counts; pull command lines and binary hashes.\n- **Live response commands:**\n  - Windows: `Get-NetTCPConnection` correlated with `Get-Process`; `netstat -anob`\n  - Linux: `ss -tanp`, `netstat -tanp`, check `/proc/<pid>/exe`\n- **Correlate process start time** with the 02:00 onset of scanning.\n- **Look for scheduled tasks / cron / startup persistence** that launched it.\n- **Hunt for LOLBins**: `powershell.exe`, `wmic`, `cscript`, `rundll32`, or tools like `nmap`, masscan, `Invoke-PortScan`, CrackMapExec, advanced_port_scanner.\n- Submit unknown hashes to your sandbox/threat-intel.\n\n## 5. Containment\n\nScale to your confidence level:\n\n1. **Network isolation** \u2014 quarantine via EDR or move to an isolation VLAN; preserves the host for forensics while stopping spread.\n2. **Preserve volatile evidence first** if feasible (memory, netconns) before isolating\u2014or rely on EDR's captured telemetry.\n3. **Block at the firewall** as a secondary control for the source IP.\n4. **Investigate the \"allowed\" connections** \u2014 any successful 445/3389 sessions are potential next-hop compromises; check those destination hosts too.\n5. **Disable/reset implicated accounts** if credentials were used for the allowed connections.\n6. **Do NOT immediately wipe** if you need attribution/scope\u2014coordinate with IR process.\n\n## 6. Hardening\n\n- **Network segmentation / microsegmentation** \u2014 workstations shouldn't freely reach 420 hosts on 445/3389/22. Restrict east-west traffic.\n- **Host firewall rules** blocking workstation-to-workstation lateral ports.\n- **Disable SMBv1**, enforce SMB signing, restrict RDP to jump hosts.\n- **Deploy honeypots/canary hosts** \u2014 scanners trip them instantly with near-zero false positives.\n- **Application allow-listing** to block unauthorized scanning tools.\n- **Network access control (NAC)** to flag/quarantine anomalous behavior automatically.\n- **Maintain a scanner allow-list** so legitimate scans are documented and excluded from alerts.\n- **LSASS protection / credential hygiene** (Credential Guard, LAPS) to limit value of harvested creds.\n\n---\n\n**Immediate next step:** Confirm whether `10.10.24.55` is an authorized scanner and check what those \"allowed\" 445/3389 connections did. That single answer determines whether this is a routine ops finding or an active incident.\n\nWant help building a specific detection query (Splunk/Sentinel/Elastic) for these thresholds?",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 340,
+    "completion_tokens": 2093,
+    "total_tokens": 2433,
+    "cost": 0.054025,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.054025,
+      "upstream_inference_prompt_cost": 0.0017,
+      "upstream_inference_completions_cost": 0.052325
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:25:36.638928+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

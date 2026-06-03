@@ -1,0 +1,34 @@
+{
+  "prompt_id": "CLOUD-02-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Why These IAM Permissions Are Dangerous\n\n## The Core Problem with Each Permission\n\n**`iam:PassRole`**\nThis permission lets a principal hand an IAM role to an AWS service (EC2, Lambda, ECS, etc.). The danger isn't passing roles per se \u2014 it's that without resource constraints, a user can pass a *more privileged* role to a service they control, then operate with that role's permissions. It's the single most common escalation primitive in AWS.\n\n**Broad `s3:*`**\nGrants every S3 action including `PutBucketPolicy`, `PutBucketAcl`, and `DeleteBucket`. An attacker can exfiltrate data, make buckets public, tamper with objects (think CloudTrail logs or deployment artifacts), or destroy data. It also often enables tampering with logging infrastructure stored in S3.\n\n**`ec2:RunInstances`**\nLaunching instances becomes dangerous when combined with `iam:PassRole` \u2014 attach a powerful instance profile, then retrieve credentials from the instance metadata service (IMDS). Also enables crypto-mining, lateral movement, and cost-based abuse.\n\n**`lambda:CreateFunction`**\nCombined with `iam:PassRole`, an attacker creates a function with a privileged execution role and invokes it to run arbitrary code with those permissions. Lambda also runs persistently and can be triggered by events, making it good for persistence.\n\n---\n\n## 1. How Security Teams Assess Blast Radius\n\n- **Enumerate effective permissions**: Resolve identity policies, resource policies, permission boundaries, SCPs, and session policies to determine *actual* effective access \u2014 not just attached policies.\n- **Map reachable resources**: Determine which roles can be passed, which services can be invoked, and what those targets can in turn access.\n- **Graph the relationships**: Tools like AWS IAM Access Analyzer, **Cartography**, **PMapper**, or **Cloudsplaining** model identities as a graph and compute privilege-escalation paths.\n- **Identify trust boundaries**: Cross-account `sts:AssumeRole`, public resource policies, and federated access widen blast radius beyond a single account.\n- **Assess data sensitivity**: Map permissions to the crown-jewel data they touch (PII stores, secrets, log buckets).\n\n---\n\n## 2. Why They Enable Privilege Escalation\n\nThe classic chains:\n\n```\niam:PassRole + lambda:CreateFunction + lambda:InvokeFunction\n  \u2192 create function with admin role \u2192 invoke \u2192 run as admin\n\niam:PassRole + ec2:RunInstances\n  \u2192 launch instance with admin instance profile \u2192 read IMDS creds \u2192 admin\n\ns3:PutBucketPolicy on a CloudTrail/config bucket\n  \u2192 tamper with or disable evidence\n```\n\nThe common denominator: **`iam:PassRole` without a `Resource` constraint** turns a limited principal into whatever role they can pass. Permissions are dangerous *in combination* \u2014 assessing them individually understates risk.\n\n---\n\n## 3. Least-Privilege Design\n\n- **Scope `iam:PassRole` tightly**: Restrict to specific role ARNs and add a `iam:PassedToService` condition:\n  ```json\n  {\n    \"Effect\": \"Allow\",\n    \"Action\": \"iam:PassRole\",\n    \"Resource\": \"arn:aws:iam::123456789012:role/specific-app-role\",\n    \"Condition\": {\n      \"StringEquals\": { \"iam:PassedToService\": \"lambda.amazonaws.com\" }\n    }\n  }\n  ```\n- **Replace wildcards**: Convert `s3:*` to the specific actions needed (`s3:GetObject`, `s3:PutObject`) scoped to specific bucket ARNs.\n- **Use permission boundaries** to cap maximum privileges, especially for roles that can create other roles.\n- **Apply SCPs** at the org level to deny dangerous actions universally (e.g., deny disabling CloudTrail).\n- **Enforce IMDSv2** to mitigate credential theft via SSRF.\n- **Prefer condition keys**: tags, source IP/VPC, MFA presence.\n- **Generate policies from observed usage** (Access Analyzer policy generation from CloudTrail).\n\n---\n\n## 4. Logs Defenders Should Monitor\n\n| Source | What to watch |\n|--------|---------------|\n| **CloudTrail** | `CreateFunction`, `RunInstances`, `PassRole`, `AssumeRole`, `CreateAccessKey`, `AttachRolePolicy`, `PutBucketPolicy` |\n| **CloudTrail data events** | S3 object-level `GetObject`/`PutObject`, Lambda invocations |\n| **GuardDuty** | Credential exfiltration, anomalous API calls, instance compromise findings |\n| **IAM Access Analyzer** | New external/public access, unused permissions |\n| **VPC Flow Logs** | Unexpected egress from new instances |\n| **Config** | Drift in IAM policies, public S3 exposure |\n\nKey signals: a role being passed to a *newly created* function/instance, IAM modifications by non-admin principals, and credential use from unexpected source IPs or regions.\n\n---\n\n## 5. Prioritising Remediation\n\nRank by **exploitability \u00d7 impact**:\n\n1. **Confirmed escalation paths to admin** \u2014 any identity that can reach `*:*` via PassRole chains. Fix first.\n2. **Internet-facing or cross-account exposure** \u2014 public S3, wide trust policies.\n3. **Permissions on security/logging infrastructure** \u2014 write access to CloudTrail buckets, ability to disable logging.\n4. **Wildcards on sensitive data stores**.\n5. **Unused but dangerous permissions** \u2014 low effort to remove, reduces attack surface.\n\nPractical sequencing:\n- Quick wins via **org-wide SCPs** (deny disabling logging, deny IAM changes from non-admins).\n- Then tighten **PassRole** scoping account by account.\n- Use **last-accessed data** to safely prune unused permissions without breaking workloads.\n- Track remediation against a measurable metric (e.g., number of identities with paths to admin \u2192 drive toward zero).\n\n---\n\n**Bottom line:** These permissions are risky because they grant *control over what runs and as whom*, and they compound dangerously in combination. The defensive priority is breaking the `PassRole`-to-privileged-role chains, eliminating wildcards, ensuring tamper-resistant logging, and continuously mapping who can reach your most sensitive resources.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 150,
+    "completion_tokens": 2206,
+    "total_tokens": 2356,
+    "cost": 0.0559,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0559,
+      "upstream_inference_prompt_cost": 0.00075,
+      "upstream_inference_completions_cost": 0.05515
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:24:50.600611+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

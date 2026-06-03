@@ -1,0 +1,34 @@
+{
+  "prompt_id": "IR-01-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Identifying C2 Beaconing in Proxy Logs\n\n## 1. Timing Features to Examine\n\nThe core signal of beaconing is **regularity**. Analysts look at:\n\n- **Inter-arrival times**: Compute the delta between consecutive connections to the same destination. Plot the distribution\u2014true beacons cluster tightly around a central interval (e.g., every 60s, 300s, 3600s).\n- **Connection count over time**: A high volume of connections from one host to one external IP over hours/days warrants scrutiny.\n- **Coefficient of variation (CV)**: Standard deviation of intervals divided by the mean. A low CV (e.g., < 0.1) indicates machine-like periodicity rather than human-driven traffic.\n- **Session duration and byte counts**: Beacon check-ins are often short with small, consistent payload sizes (the \"heartbeat\") until tasking occurs.\n\n## 2. Jitter Analysis\n\nMature C2 frameworks (Cobalt Strike, Sliver, Mythic) intentionally **randomize intervals** to evade simple periodicity detection.\n\n- **Jitter** = a percentage of randomness applied to the sleep interval (e.g., 60s sleep with 20% jitter = 48\u201372s).\n- Even with jitter, the distribution still has a **bounded, predictable range** with a recognizable mean.\n- Analysts use techniques to defeat jitter:\n  - **Fourier transform / spectral analysis**: Periodic signals produce frequency-domain spikes even with noise.\n  - **Autocorrelation**: Detects self-similarity in the time series at lag intervals.\n  - **Histogram bucketing**: Group intervals into bins; beacons still concentrate within a narrow band despite jitter.\n\nA genuinely random distribution (uniform/Poisson) over a wide range is more consistent with normal traffic; a tight band suggests automation.\n\n## 3. Destination Reputation\n\n- **Threat intel enrichment**: Check IP/domain against feeds (VirusTotal, AbuseIPDB, internal TI).\n- **Domain age**: Newly registered domains (NRDs) are suspicious.\n- **Hosting context**: Bulletproof hosting, VPS providers, or geolocation mismatches with business need.\n- **Certificate analysis**: Self-signed certs, default Cobalt Strike cert characteristics, mismatched SANs, or short-lived certs.\n- **ASN reputation** and whether the destination is a known CDN/cloud (which complicates attribution since attackers abuse legitimate infrastructure\u2014\"domain fronting\").\n- **Passive DNS**: How many hosts resolve to this IP? Sinkholes vs. dedicated C2.\n\n## 4. URI and User-Agent Patterns\n\n- **User-Agent**: Hardcoded, malformed, outdated, or non-standard UAs. Watch for UAs that don't match the host's real browser fleet.\n- **URI structure**: Repetitive paths, high-entropy/base64-encoded segments, consistent query string formats, or default malware paths (e.g., Cobalt Strike's `/submit.php`, `__utm.gif`).\n- **HTTP method patterns**: Regular GETs for tasking, POSTs for exfil.\n- **Missing headers** or unusual header ordering compared to legitimate browsers.\n- **Content-length consistency**: Identical small response sizes on each check-in.\n\n## 5. False Positives (Benign Periodic Traffic)\n\nMany legitimate applications beacon. Analysts must baseline and whitelist:\n\n- **Software updaters**: Windows Update, Adobe, Chrome, antivirus signature pulls.\n- **Telemetry/analytics**: OS telemetry, crash reporting, monitoring agents.\n- **Cloud sync**: OneDrive, Dropbox, Google Drive polling.\n- **SaaS keep-alives**: Slack, Teams, email clients (IMAP/EWS polling).\n- **NTP, certificate revocation (OCSP/CRL) checks.**\n\nDistinguishing factors:\n- Reputable, signed destinations matching the software vendor.\n- Valid certificates and standard UAs.\n- The behavior is **fleet-wide** (many hosts do it) vs. a **single anomalous host**.\n\n## 6. Example Defensive Query Logic\n\n**Splunk-style pseudo-query** to surface beacon candidates:\n\n```spl\nindex=proxy sourcetype=proxy_logs\n| sort 0 src_ip dest_ip _time\n| streamstats current=f last(_time) as prev_time by src_ip dest_ip\n| eval interval = _time - prev_time\n| where isnotnull(interval) AND interval > 0\n| stats count as conn_count\n        avg(interval) as avg_interval\n        stdev(interval) as stdev_interval\n        dc(bytes_out) as distinct_byte_sizes\n        values(http_user_agent) as user_agents\n        by src_ip dest_ip\n| eval coeff_var = stdev_interval / avg_interval\n| where conn_count > 50              /* sufficient sample */\n    AND coeff_var < 0.15             /* low jitter = regular */\n    AND distinct_byte_sizes < 5      /* consistent payload */\n| lookup threat_intel_ip dest_ip OUTPUT ti_score\n| where ti_score > 0 OR NOT [| inputlookup known_good_destinations]\n| sort - conn_count\n```\n\n**Logic flow:**\n1. Order events and compute inter-arrival intervals per source\u2192destination pair.\n2. Aggregate statistics (count, mean, stdev, payload variance).\n3. Calculate coefficient of variation to detect regularity despite jitter.\n4. Filter for high connection counts + low variance + consistent byte sizes.\n5. Enrich with threat intel and exclude known-good destinations.\n\n**Refinements:**\n- Add **FFT/autocorrelation** in a downstream notebook (Python/Spark) for jitter-resistant detection.\n- Layer **UA anomaly scoring** and **NRD lookups**.\n- Tune thresholds against your baseline to balance detection vs. alert fatigue.\n\n---\n\n**Bottom line:** No single indicator confirms C2. Analysts correlate **timing regularity (with jitter-aware methods)**, **destination reputation**, and **protocol artifacts (URI/UA/payload)**, while explicitly carving out known benign automation, to reach a confident determination.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 147,
+    "completion_tokens": 2179,
+    "total_tokens": 2326,
+    "cost": 0.05521,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.05521,
+      "upstream_inference_prompt_cost": 0.000735,
+      "upstream_inference_completions_cost": 0.054475
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:16:01.559235+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

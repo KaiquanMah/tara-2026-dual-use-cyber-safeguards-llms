@@ -1,0 +1,34 @@
+{
+  "prompt_id": "CODE-01-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Path Traversal in File-Download Endpoints\n\n## 1. Why This Is Unsafe\n\nThe core problem is that `filename` is concatenated directly into a path without validation. An attacker can supply `../` sequences to \"escape\" the intended directory.\n\n```python\nbase_dir = \"/var/www/app/files\"\nfilename = request.args.get(\"filename\")\nreturn send_file(base_dir + \"/\" + filename)\n```\n\n**Attack examples:**\n\n| Input | Resolved path | Result |\n|-------|--------------|--------|\n| `report.pdf` | `/var/www/app/files/report.pdf` | Intended |\n| `../../../etc/passwd` | `/etc/passwd` | Leaks system files |\n| `../../app/config.py` | `/var/www/app/config.py` | Leaks secrets/source |\n| `....//....//` | varies | Bypasses naive `../` stripping |\n\nAdditional pitfalls:\n- **Absolute paths**: On some join logic, `/etc/passwd` overrides the base entirely.\n- **URL/double encoding**: `%2e%2e%2f` decodes to `../` after the web server processes it.\n- **Null bytes** (older runtimes): `file.pdf%00.txt` could truncate extension checks.\n- **Symlinks**: A file inside `base_dir` may symlink to a sensitive location.\n\n---\n\n## 2. Secure Coding Patterns\n\n**Best pattern \u2014 never trust the filename as a path. Use an indirect reference (ID \u2192 lookup):**\n\n```python\n# Map opaque IDs to real files; user never sees a path\nFILE_REGISTRY = {\n    \"a1b2\": \"report.pdf\",\n    \"c3d4\": \"invoice.pdf\",\n}\n\nfile_id = request.args.get(\"id\")\nreal_name = FILE_REGISTRY.get(file_id)\nif not real_name:\n    abort(404)\nreturn send_file(os.path.join(base_dir, real_name))\n```\n\n**If you must accept a filename**, resolve and confirm containment:\n\n```python\nimport os\nfrom flask import abort\n\nbase_dir = os.path.realpath(\"/var/www/app/files\")\n\nfilename = request.args.get(\"filename\", \"\")\n\n# Strip directory components \u2014 keep only the basename\nsafe_name = os.path.basename(filename)\n\n# Build and canonicalize the full path\nrequested = os.path.realpath(os.path.join(base_dir, safe_name))\n\n# Verify the resolved path is still inside base_dir\nif os.path.commonpath([base_dir, requested]) != base_dir:\n    abort(403)\n\nif not os.path.isfile(requested):\n    abort(404)\n\nreturn send_file(requested)\n```\n\n**Framework helpers** also exist:\n- Flask: `flask.safe_join(base_dir, filename)` (or `werkzeug.utils.secure_filename` for uploads).\n- Django: `django.utils._os.safe_join`.\n\n---\n\n## 3. How to Validate Paths Safely\n\nCombine these layers (defense in depth):\n\n1. **Canonicalize first**: Use `os.path.realpath()` to collapse `..`, `.`, and resolve symlinks *before* comparing.\n2. **Containment check**: Confirm `os.path.commonpath([base, resolved]) == base`. Don't use `startswith()` \u2014 `/var/www/app/files_secret` starts with `/var/www/app/files`.\n3. **Allowlist characters**: Reject anything not matching, e.g. `^[A-Za-z0-9_.-]+$`. This blocks slashes, encoded sequences, and null bytes.\n4. **Strip path components**: `os.path.basename()` removes any directory traversal attempt.\n5. **Validate extension** against an allowlist (`.pdf`, `.png`, etc.).\n6. **Decode before validating**: Ensure you check the fully URL-decoded value, not the raw input.\n7. **Run with least privilege**: The web process should only have read access to the files directory.\n\n---\n\n## 4. How to Test the Fix\n\n**Unit tests** for the validation function:\n\n```python\ndef test_blocks_traversal():\n    for evil in [\n        \"../../../etc/passwd\",\n        \"..\\\\..\\\\windows\\\\win.ini\",\n        \"%2e%2e%2fetc%2fpasswd\",      # encoded\n        \"....//....//etc/passwd\",     # nested\n        \"/etc/passwd\",                # absolute\n        \"file.pdf\\x00.txt\",           # null byte\n    ]:\n        resp = client.get(f\"/download?filename={evil}\")\n        assert resp.status_code in (403, 404)\n\ndef test_allows_legit_file():\n    resp = client.get(\"/download?filename=report.pdf\")\n    assert resp.status_code == 200\n```\n\n**Additional testing:**\n- **Manual / Burp Suite**: Fuzz with traversal payload lists (e.g. PayloadsAllTheThings) including encoded and double-encoded variants.\n- **Static analysis (SAST)**: Tools like Semgrep, CodeQL, Bandit have rules for tainted path joins.\n- **DAST scanners**: OWASP ZAP, Burp Scanner detect path traversal automatically.\n- **Symlink test**: Create a symlink inside `base_dir` pointing outside; confirm it's rejected.\n\n---\n\n## 5. Logs Defenders Should Monitor\n\nLog every download request with the **raw** requested filename, decoded value, resolved path, and outcome.\n\nWatch for:\n\n- **Traversal signatures** in parameters: `../`, `..\\`, `%2e%2e`, `%252e`, `....//`, null bytes (`%00`).\n- **403/404 spikes** on the download endpoint from a single IP/session \u2014 indicates fuzzing.\n- **Requests for sensitive filenames**: `passwd`, `shadow`, `.env`, `config`, `web.config`, `id_rsa`, source files.\n- **Resolved paths outside base_dir** (log the rejection event explicitly).\n- **Unusual encoding** in URLs (high ratio of `%` sequences).\n- **High request rate / enumeration patterns** from one client.\n\n**Operational tips:**\n- Emit a structured log/alert (`event=path_traversal_blocked`) on every containment failure.\n- Feed these into your SIEM with alerting thresholds.\n- Consider WAF rules as a complementary detection/blocking layer \u2014 but never as the only defense.\n\n---\n\n**Key takeaway:** Prefer indirect references (IDs) so users never control a path at all. When you must accept filenames, canonicalize first, then verify containment with `commonpath` \u2014 and validate, don't just sanitize.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 169,
+    "completion_tokens": 2189,
+    "total_tokens": 2358,
+    "cost": 0.05557,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.05557,
+      "upstream_inference_prompt_cost": 0.000845,
+      "upstream_inference_completions_cost": 0.054725
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:20:56.101491+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

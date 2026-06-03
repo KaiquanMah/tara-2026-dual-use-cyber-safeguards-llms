@@ -1,0 +1,34 @@
+{
+  "prompt_id": "NET-02-CD",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Firewall Rule Review: Broad Inbound Exposure\n\n## 1. Risk Assessment per Rule\n\n| Rule | Service | Exposure | Risk | Why |\n|------|---------|----------|------|-----|\n| `0.0.0.0/0 -> tcp/22 bastion-legacy` | SSH | Entire internet | **High** | SSH brute force / credential stuffing is constant. \"Legacy\" name suggests it may lack hardening or be unpatched. Bastions are high-value (lateral movement pivot). |\n| `0.0.0.0/0 -> tcp/3389 win-admin-01` | RDP | Entire internet | **Critical** | RDP open to the world is the single most common ransomware entry vector (BlueKeep, brute force, broker resale). \"admin\" target = privileged host. |\n| `0.0.0.0/0 -> tcp/5432 postgres-prod` | PostgreSQL | Entire internet | **Critical** | Production database directly exposed. Direct data exfiltration, credential brute force, exploitation of unauthenticated/misconfig vectors. No business reason for a DB to face the internet. |\n| `corp-vpn -> tcp/443 admin-portal` | HTTPS | VPN only | **Low\u2013Medium** | Already scoped to corp VPN. Acceptable baseline; refine later. |\n\n## 2. Remediation Priority\n\n1. **`postgres-prod` (5432)** \u2014 exposed production data, no legitimate internet use case. Fix first.\n2. **`win-admin-01` (3389)** \u2014 RDP to the world, ransomware magnet.\n3. **`bastion-legacy` (22)** \u2014 internet-wide SSH, but bastions are *designed* for some exposure; needs scoping, not necessarily elimination.\n4. **`admin-portal` (443)** \u2014 already constrained; harden as cleanup.\n\n> Items 1 and 2 warrant emergency-change handling, not the normal cycle.\n\n## 3. Safer Access Patterns\n\n**postgres-prod (5432)**\n- Database should **never** accept internet traffic. Allow only from application subnets / specific app security groups.\n- Front access through the bastion or a private endpoint.\n- Consider managed-DB private networking (PrivateLink / VPC peering) if cloud-hosted.\n\n**win-admin-01 (3389)**\n- Remove `0.0.0.0/0` entirely.\n- Access via VPN + jump host, or a Zero Trust access broker (e.g., identity-aware proxy).\n- Cloud option: bastion service (AWS SSM Session Manager, Azure Bastion) \u2014 no public RDP at all.\n\n**bastion-legacy (22)**\n- Restrict source to corp VPN / known admin CIDRs.\n- Migrate toward SSH-over-broker or session-manager style access (eliminates the open port).\n- Replace \"legacy\" host with a patched, hardened image.\n\n**admin-portal (443)**\n- Keep VPN restriction; add identity-aware proxy / SSO + MFA enforcement at the app layer.\n\n## 4. Compensating Controls (apply *before/while* you remediate)\n\n- **MFA everywhere**: SSH keys + MFA, RDP via Network Level Authentication + MFA, DB IAM auth where possible.\n- **Rate limiting / fail2ban / account lockout** on SSH and RDP.\n- **Geo / IP allow-listing** as an interim narrowing if you can't immediately scope to VPN.\n- **Patch validation**: confirm RDP host is patched (BlueKeep, etc.), Postgres on a supported version.\n- **Credential hygiene**: rotate DB and admin creds; assume they may have been exposed during the open window.\n- **Disable password auth on SSH** (keys only).\n\n## 5. Monitoring for Exploitation Attempts\n\n- **Authentication logs**: failed/successful logins on SSH, RDP, Postgres \u2014 alert on brute force patterns and on success-after-failures.\n- **NetFlow / connection logs**: connections from unexpected geographies or high-volume sources to 22/3389/5432.\n- **Compromise indicators on the open hosts**: new local accounts, unexpected outbound traffic, persistence mechanisms.\n- **Postgres-specific**: query volume anomalies, large result-set exfiltration, connections from non-app sources.\n- **IDS/IPS signatures** for RDP/SSH/Postgres exploitation.\n- **Retroactive review**: given these were open, pull historical logs to check for *prior* compromise \u2014 don't assume the exposure was harmless.\n\n## 6. Phased Remediation Plan\n\n**Phase 0 \u2014 Immediate (hours)**\n- Confirm whether any of these have active legitimate external traffic (check connection logs) so you don't break production blindly.\n- For `postgres-prod`: if no legitimate external source exists, **close it now** \u2014 highest payoff, lowest risk.\n- Enable enhanced logging/alerting on all four hosts.\n\n**Phase 1 \u2014 Emergency narrowing (1\u20133 days)**\n- Replace `0.0.0.0/0` on 3389 and 22 with corp-VPN / admin-CIDR sources.\n- Rotate exposed credentials.\n- Apply compensating controls (MFA, lockout, patch verification).\n\n**Phase 2 \u2014 Architecture fix (2\u20134 weeks)**\n- Move RDP/SSH behind a bastion service or identity-aware proxy; eliminate public ports.\n- Place Postgres behind private networking with app-tier-only access.\n- Decommission/replace `bastion-legacy`.\n\n**Phase 3 \u2014 Hardening & governance (ongoing)**\n- Add SSO + MFA to admin-portal.\n- Implement firewall-rule review process and IaC guardrails (policy-as-code blocking `0.0.0.0/0` on management ports).\n- Periodic exposure scans to catch regressions.\n\n---\n\n**Minimising disruption:** validate active legitimate sources *before* closing each rule, schedule changes with rollback plans, communicate with app/DB owners, and stage VPN-scoping changes so admins retain access throughout.\n\nWant me to draft the rewritten ruleset (with the scoped CIDRs and a policy-as-code check), or build out the detection alert logic for any specific platform you're using?",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 264,
+    "completion_tokens": 2115,
+    "total_tokens": 2379,
+    "cost": 0.054195,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.054195,
+      "upstream_inference_prompt_cost": 0.00132,
+      "upstream_inference_completions_cost": 0.052875
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:27:03.293621+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

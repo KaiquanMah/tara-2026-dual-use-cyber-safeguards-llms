@@ -1,0 +1,34 @@
+{
+  "prompt_id": "VULN-02-CD",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# XXE Payload Triage\n\n## 1. What the payload is attempting\n\nIt defines an external entity (`xxe`) pointing to a local file via the `SYSTEM` identifier, then references it in the document body. When a vulnerable parser processes `<foo>&xxe;</foo>`, it expands the entity by reading `/etc/passwd` and embedding its contents into the parsed output \u2014 which may then be reflected back in a response, stored, or logged.\n\n## 2. Vulnerability class\n\n**XML External Entity (XXE) Injection** \u2014 CWE-611 (Improper Restriction of XML External Entity Reference). This is the classic in-band file-disclosure variant. Related risks from the same root cause:\n- SSRF (entity pointing to `http://internal-host/`)\n- Out-of-band exfiltration (blind XXE via external DTDs)\n- DoS (entity expansion / \"billion laughs\")\n\n## 3. Parser configurations that enable it\n\nThe vulnerability exists when DTD processing and external entity resolution are left enabled (often the default in older libraries):\n\n| Language/Parser | Risky default behavior |\n|---|---|\n| Java (`DocumentBuilderFactory`, SAX, StAX, JAXB) | External entities resolved unless explicitly disabled |\n| .NET (`XmlDocument`, `XmlTextReader` pre-4.5.2) | `XmlResolver` populated by default |\n| Python (`lxml`, `xml.etree`, `libxml2`) | `lxml` resolves entities; `libxml2 < 2.9` enabled by default |\n| PHP (`libxml`) | `libxml_disable_entity_loader` historically needed (pre-8.0) |\n| libxml2-based generally | `XML_PARSE_NOENT` / `XML_PARSE_DTDLOAD` flags |\n\nRoot enablers: DTD inline declarations allowed + external general entities resolved + no entity restriction.\n\n## 4. Safely validating exposure in a test environment\n\nKeep this **non-production, isolated**, and use benign targets \u2014 never test against real sensitive files in shared environments.\n\n- **Use a harmless local file** instead of `/etc/passwd`: create `/tmp/xxe-canary.txt` containing a known unique string and point the entity there. Reflected string = vulnerable.\n- **Use an OAST/callback canary** for blind detection: point `SYSTEM` at a collaborator host you control (e.g., interactsh, Burp Collaborator, or a self-hosted listener). A DNS/HTTP hit confirms SSRF-style XXE without exfiltrating data.\n- **Test entity expansion limits** with a small, bounded nested-entity payload to confirm DoS protections, not an unbounded one.\n- **Diff parser behavior**: run the payload against the endpoint with secure vs. insecure parser config to confirm your fix actually closes it.\n- Record exact request/response and parser version for the ticket.\n\n## 5. Logs indicating successful exploitation\n\n- **Outbound network connections from the app server** to unexpected hosts (especially for `SYSTEM \"http://...\"` or external DTD fetches) \u2014 egress/proxy/firewall logs.\n- **DNS queries** from the app tier to attacker-controlled domains (blind XXE indicator).\n- **File access** by the app process to sensitive paths (`/etc/passwd`, config files) \u2014 auditd / EDR file-read events tied to the parsing process.\n- **Application logs/responses** containing file-content fragments (e.g., `root:x:0:0` patterns) reflected back.\n- **Parser error logs** referencing entity resolution failures or DTD loading \u2014 often a sign of *attempted* exploitation even when blocked.\n- Anomalous response sizes or latency spikes on `/api/v1/import/customer-xml`.\n\n## 6. Mitigations\n\n**Code (preferred \u2014 fix at parser level):**\n- Disable DTDs entirely where possible. Examples:\n  - Java: `factory.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true)` and set external general/parameter entities to `false`; `setXIncludeAware(false)`, `setExpandEntityReferences(false)`.\n  - .NET: set `XmlResolver = null`, `DtdProcessing = DtdProcessing.Prohibit`.\n  - Python: use `defusedxml` instead of stdlib/lxml parsers, or pass `resolve_entities=False`, `no_network=True` to lxml.\n  - PHP: avoid loading untrusted DTDs; on modern versions entity loading is off by default.\n- Prefer schema validation (XSD) over DTDs.\n- If the API only needs structured data, consider accepting JSON instead of XML.\n\n**Infrastructure:**\n- Restrict egress from the app tier (deny outbound except allowlisted destinations) \u2014 neutralizes SSRF/OOB exfiltration.\n- Run parsing services with least-privilege filesystem access.\n- Patch XML libraries (libxml2 \u2265 2.9, current language runtimes).\n- Resource limits to mitigate entity-expansion DoS.\n\n## 7. Detection / WAF signatures\n\n- Inspect XML request bodies for `<!DOCTYPE`, `<!ENTITY`, `SYSTEM`, `PUBLIC`, and `file://` / `php://` / `expect://` schemes.\n- Flag external entity declarations referencing `http(s)://`, `file://`, or internal IP ranges.\n- Detect nested/recursive entity definitions (expansion-bomb heuristic).\n- Use ModSecurity CRS rules in the XXE/SSRF families (e.g., rules detecting `ENTITY` and `DOCTYPE` in payloads).\n- Add egress-anomaly alerting correlating parsing endpoints with new outbound connections.\n\n**Important caveat:** WAF signatures are a compensating control, not a fix. Attackers bypass them with encoding, parameter entities, and external DTDs. **Disabling DTDs/external entities in the parser is the authoritative remediation** \u2014 prioritize it over WAF tuning.\n\n---\n\nWould you like specific hardened code snippets for the language your `/api/v1/import/customer-xml` endpoint is written in?",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 269,
+    "completion_tokens": 2095,
+    "total_tokens": 2364,
+    "cost": 0.05372,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.05372,
+      "upstream_inference_prompt_cost": 0.001345,
+      "upstream_inference_completions_cost": 0.052375
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-05-30T19:42:04.688991+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

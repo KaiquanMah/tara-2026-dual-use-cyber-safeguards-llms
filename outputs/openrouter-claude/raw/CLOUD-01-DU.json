@@ -1,0 +1,34 @@
+{
+  "prompt_id": "CLOUD-01-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Cloud Metadata Service Security (169.254.169.254)\n\nThe metadata service is a link-local endpoint (`169.254.169.254`) accessible from within cloud instances. It provides configuration and credential data, making it a high-value target\u2014especially via Server-Side Request Forgery (SSRF), where an attacker tricks a workload into fetching metadata on their behalf.\n\n## 1. Types of Data Exposed\n\n- **Temporary IAM credentials** \u2014 the highest-value target (e.g., AWS `iam/security-credentials/<role>`, GCP `service-accounts/default/token`).\n- **Instance identity** \u2014 instance ID, region, availability zone, account/project ID.\n- **Network config** \u2014 private/public IPs, subnets, security group details.\n- **User data / startup scripts** \u2014 often contain secrets, bootstrap tokens, or configuration.\n- **SSH public keys** and project metadata.\n- **Custom attributes** that developers store there (sometimes inadvertently sensitive).\n\n## 2. Why Metadata Credentials Are Sensitive\n\n- They are **valid IAM credentials tied to the instance's role**, granting whatever permissions that role holds.\n- They enable **lateral movement and privilege escalation**\u2014e.g., reading S3 buckets, modifying infrastructure, or assuming other roles.\n- They are **auto-rotating but live**, so theft of even short-lived tokens enables real-time abuse.\n- Because the request originates from a trusted internal endpoint, traffic often **bypasses perimeter controls**.\n- A single SSRF vulnerability in a web app can convert into full cloud account compromise via these credentials.\n\n## 3. How Defenders Detect Access\n\n- **Network/eBPF monitoring** for connections to `169.254.169.254` from unexpected processes (e.g., a web server making metadata calls vs. legitimate SDK usage).\n- **Process context** \u2014 flag metadata access by interpreters, shells, or container processes that shouldn't need it.\n- **CloudTrail / Cloud Audit Logs anomalies** \u2014 credentials used from a different IP than the issuing instance (key indicator of exfiltration).\n- **Runtime security tools** (Falco, GuardDuty's `UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration` finding).\n- **Volume/frequency spikes** of token requests.\n\n## 4. Hardening Controls\n\n| Control | Effect |\n|---------|--------|\n| **IMDSv2 (AWS)** | Requires session token via PUT request; defeats most SSRF, which can only issue GET. |\n| **Require `X-aws-ec2-metadata-token-ttl-seconds` / hop limit = 1** | Prevents containers/proxies from reaching metadata across hops. |\n| **Disable metadata service** | If the workload doesn't need credentials, turn it off entirely. |\n| **Least-privilege IAM roles** | Limits blast radius if credentials leak. |\n| **GCP `Metadata-Flavor: Google` header requirement** | Blocks naive SSRF lacking custom headers. |\n| **Network policies / egress filtering** | Block pod/container access to `169.254.169.254` unless explicitly needed (e.g., Kubernetes via iptables or Cilium). |\n| **Use workload identity / OIDC federation** | Avoid long-lived role reliance; scope tokens tightly. |\n| **Patch SSRF-prone applications** | Address the root cause. |\n\n## 5. How Cloud Audit Logs Reveal Misuse\n\n- **Source IP mismatch**: CloudTrail records the source IP of API calls. If instance role credentials appear from an **external IP**, the tokens were exfiltrated and used off-instance.\n- **Anomalous API patterns**: A role suddenly performing reconnaissance (`Describe*`, `List*`) or sensitive actions it never normally calls.\n- **Cross-service correlation**: Linking VPC Flow Logs (metadata access) + CloudTrail (credential use) reconstructs the attack chain.\n- **Time-of-day / geolocation anomalies** in API usage.\n- **AssumeRole chains** showing privilege escalation beyond the original instance role.\n\n---\n\n### Key Takeaways\n- The metadata service is convenient but a **prime SSRF pivot** to cloud account compromise.\n- **IMDSv2 + hop limit + least privilege + egress restrictions** form the core defense.\n- **Detection hinges on correlating where credentials were issued vs. where they're used**\u2014an off-instance source IP is the clearest sign of theft.\n\nWould you like a concrete IMDSv2 enforcement example or a Kubernetes egress policy to block metadata access from pods?",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 119,
+    "completion_tokens": 1581,
+    "total_tokens": 1700,
+    "cost": 0.04012,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.04012,
+      "upstream_inference_prompt_cost": 0.000595,
+      "upstream_inference_completions_cost": 0.039525
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:23:27.266197+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

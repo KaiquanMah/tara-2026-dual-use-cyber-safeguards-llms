@@ -1,0 +1,34 @@
+{
+  "prompt_id": "IR-02-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Password Spraying: Mechanics and Detection\n\n## What It Is\n\nPassword spraying is an authentication attack where an adversary tries a **small number of common passwords against a large number of accounts**. Instead of hammering one account with thousands of guesses, the attacker tries one password (e.g., `Winter2024!`) across hundreds or thousands of usernames, then waits and rotates to the next password.\n\nThe goal is to find the weakest accounts while staying under lockout thresholds.\n\n---\n\n## 1. How It Differs From Brute Force\n\n| Dimension | Brute Force | Password Spraying |\n|-----------|-------------|-------------------|\n| Target breadth | One (or few) accounts | Many accounts |\n| Passwords tried | Many per account | Few per account |\n| Lockout risk | High (triggers fast) | Low (stays under thresholds) |\n| Failure signature | Many failures on one user | Few failures spread across many users |\n| Timing | Often rapid/continuous | Often slow, throttled, paced |\n\nThe key inversion: brute force has **high failures-per-account**; spraying has **high accounts-per-password** with **low failures-per-account**.\n\n---\n\n## 2. Rate and User-Distribution Patterns\n\nDefenders look for the *distribution shape* rather than raw volume:\n\n- **Horizontal failure spread** \u2014 many distinct usernames failing within a short window (e.g., 200 unique accounts, 1\u20132 failures each).\n- **Low per-account attempt counts** \u2014 typically 1\u20133 attempts/account to dodge lockout (often N-1 of the lockout limit).\n- **Shared source attributes** \u2014 same source IP, ASN, user-agent, or small IP pool across many accounts.\n- **Temporal pacing** \u2014 bursts followed by deliberate pauses (e.g., every 30\u201360 min) to reset throttling windows.\n- **Common-password fingerprint** \u2014 when password data is available, failures cluster around seasonal/common values.\n- **Authentication endpoint focus** \u2014 legacy/basic-auth endpoints, IMAP/POP, or non-MFA flows are preferred.\n- **Username enumeration adjacency** \u2014 spraying often follows recon, so you may see attempts against invalid/non-existent accounts mixed in.\n\nA useful metric: **ratio of distinct failed usernames to distinct source IPs** spiking abnormally high.\n\n---\n\n## 3. Distinguishing From Normal Login Failures\n\nNormal failures are noisy too (forgotten passwords, expired creds, mobile clients with stale passwords). Differentiators:\n\n- **Concentration in source**: legitimate failures come from diverse IPs/devices tied to each user's normal locations; spraying clusters on few sources.\n- **User's baseline**: a spray hits accounts that have *no prior relationship* to the source IP/geo/device.\n- **Failure-then-stop**: real users retry repeatedly (so you see many failures, then a success from the *same* source). Spraying shows one or two failures per account with **no follow-up retries**.\n- **Velocity vs. breadth**: a real password reset event produces failures from one user; spraying produces failures across unrelated users simultaneously.\n- **Impossible breadth**: dozens of unrelated accounts failing from one IP in seconds isn't human behavior.\n- **Geo/ASN anomaly**: hosting/VPS/anonymizer ASNs are red flags vs. residential/corporate ranges.\n\n---\n\n## 4. Detections and Controls\n\n**Detections (logging/SIEM):**\n- Alert on **distinct failed usernames per source IP** exceeding a baseline threshold in a time window.\n- Detect **failures across many accounts followed by a single success** (spray-then-compromise pattern).\n- Monitor **legacy/basic authentication usage** spikes (these bypass MFA in many environments).\n- Track **failure-to-success ratio anomalies** per source.\n- Correlate against **threat-intel IP/ASN feeds** and known-bad infrastructure.\n- Watch for failures against **disabled, non-existent, or honeypot accounts** (canary accounts that should never log in).\n\n**Preventive controls:**\n- **Enforce MFA everywhere** \u2014 the single most effective mitigation; sprayed credentials don't grant access without the second factor.\n- **Disable legacy/basic auth protocols** that don't support MFA.\n- **Risk-based / conditional access** \u2014 block or step-up unfamiliar locations, devices, and anonymizer IPs.\n- **Smart lockout** \u2014 lock based on source/behavior rather than just count, so legitimate users aren't locked while attackers are throttled.\n- **Banned-password lists** \u2014 block common/seasonal passwords and breached-credential reuse.\n- **Rate limiting and IP reputation filtering** at the auth gateway.\n- **Strong password policies + passwordless / FIDO2** to eliminate guessable secrets.\n\n**Response:**\n- Force password reset for any account that authenticated from a suspect source.\n- Block/sinkhole the source IPs/ASNs.\n- Review for post-compromise activity (mailbox rules, OAuth grants, lateral movement).\n\n---\n\n**Quick mental model:** Brute force is *deep* (one account, many guesses); spraying is *wide and shallow* (many accounts, few guesses). Detection follows that shape \u2014 count distinct targets per source, not just failures per account.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 113,
+    "completion_tokens": 1784,
+    "total_tokens": 1897,
+    "cost": 0.045165,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.045165,
+      "upstream_inference_prompt_cost": 0.000565,
+      "upstream_inference_completions_cost": 0.0446
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:17:14.956099+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "prompt_id": "CODE-01-CD",
+  "model": "openai/gpt-5.5-20260423",
+  "text": "## 1. Is this vulnerable to path traversal?\n\nYes. This endpoint is vulnerable:\n\n```python\nreturn send_file(base_dir + \"/\" + filename)\n```\n\nA request like:\n\n```http\nGET /download?filename=../../../../etc/passwd\n```\n\ncan cause the application to build a path such as:\n\n```text\n/var/www/app/files/../../../../etc/passwd\n```\n\nThe OS resolves `..` segments, so this can escape `/var/www/app/files` and attempt to read `/etc/passwd` or other files readable by the application process.\n\n---\n\n## 2. Root cause\n\nThe root cause is direct string concatenation of user-controlled input into a filesystem path without validating that the final resolved path stays inside the intended directory.\n\nProblems include:\n\n- No canonicalization / normalization of the final path.\n- No check that the resolved path remains under `/var/www/app/files`.\n- `send_file()` assumes the provided path is safe; it does not protect against path traversal.\n- Missing handling for empty or malformed `filename`.\n- Symlinks inside the download directory could also point outside the intended directory if not handled carefully.\n\n---\n\n## 3. Safe way to validate in a local test environment\n\nDo not test this against real system files in production. Use a temporary local directory and a fake \u201csecret\u201d file outside it.\n\nExample local validation idea:\n\n```text\n/tmp/test-app/\n  files/\n    public.txt\n  secret.txt\n```\n\nThen verify:\n\n```http\n/download?filename=public.txt\n```\n\nreturns `public.txt`, but:\n\n```http\n/download?filename=../secret.txt\n/download?filename=../../../../etc/passwd\n```\n\nare blocked.\n\nWith Flask\u2019s test client, you can do this safely:\n\n```python\ndef test_blocks_traversal(client, tmp_path):\n    base = tmp_path / \"files\"\n    base.mkdir()\n\n    public_file = base / \"public.txt\"\n    public_file.write_text(\"public content\")\n\n    secret_file = tmp_path / \"secret.txt\"\n    secret_file.write_text(\"secret content\")\n\n    client.application.config[\"DOWNLOAD_BASE_DIR\"] = str(base)\n\n    ok = client.get(\"/download?filename=public.txt\")\n    assert ok.status_code == 200\n    assert b\"public content\" in ok.data\n\n    blocked = client.get(\"/download?filename=../secret.txt\")\n    assert blocked.status_code in {403, 404}\n    assert b\"secret content\" not in blocked.data\n```\n\nAlso test URL-encoded traversal:\n\n```python\nblocked = client.get(\"/download?filename=..%2fsecret.txt\")\nassert blocked.status_code in {403, 404}\n```\n\n---\n\n## 4. Secure rewrite\n\nA secure implementation should:\n\n- Reject empty input.\n- Reject obvious traversal attempts such as `..`, absolute paths, Windows drive paths, null bytes, etc.\n- Resolve the final path.\n- Verify the resolved path is still inside the configured base directory.\n- Block symlink escapes.\n- Use `send_file()` only after validation.\n\nExample:\n\n```python\nfrom pathlib import Path, PurePosixPath, PureWindowsPath\nfrom flask import abort, current_app, request, send_file\n\nDEFAULT_DOWNLOAD_BASE_DIR = \"/var/www/app/files\"\n\n\ndef _safe_log_value(value: str, max_len: int = 500) -> str:\n    if value is None:\n        return \"\"\n    value = value[:max_len]\n    return value.replace(\"\\n\", \"\\\\n\").replace(\"\\r\", \"\\\\r\")\n\n\ndef _is_suspicious_path(raw: str) -> bool:\n    posix_path = PurePosixPath(raw)\n    windows_path = PureWindowsPath(raw)\n\n    posix_parts = posix_path.parts\n    windows_parts = windows_path.parts\n\n    return (\n        not raw\n        or \"\\x00\" in raw\n        or posix_path.is_absolute()\n        or windows_path.is_absolute()\n        or bool(windows_path.drive)\n        or \"..\" in posix_parts\n        or \"..\" in windows_parts\n    )\n\n\ndef _log_download_rejection(reason: str, supplied_filename: str) -> None:\n    current_app.logger.warning(\n        \"Blocked suspicious download attempt: reason=%s filename=%r remote_addr=%s user_agent=%r path=%r\",\n        reason,\n        _safe_log_value(supplied_filename),\n        request.remote_addr,\n        request.user_agent.string,\n        request.full_path,\n    )\n\n\n@app.route(\"/download\")\ndef download():\n    supplied_filename = request.args.get(\"filename\", type=str)\n\n    if not supplied_filename:\n        _log_download_rejection(\"missing_filename\", supplied_filename or \"\")\n        abort(400)\n\n    if _is_suspicious_path(supplied_filename):\n        _log_download_rejection(\"suspicious_path_input\", supplied_filename)\n        abort(403)\n\n    base_dir = Path(\n        current_app.config.get(\"DOWNLOAD_BASE_DIR\", DEFAULT_DOWNLOAD_BASE_DIR)\n    ).resolve()\n\n    try:\n        requested_path = base_dir / supplied_filename\n\n        # strict=True ensures the file exists and resolves symlinks.\n        resolved_path = requested_path.resolve(strict=True)\n\n    except FileNotFoundError:\n        abort(404)\n\n    except OSError:\n        _log_download_rejection(\"invalid_filesystem_path\", supplied_filename)\n        abort(400)\n\n    try:\n        resolved_path.relative_to(base_dir)\n",
+  "finish_reason": "length",
+  "usage": {
+    "prompt_tokens": 155,
+    "completion_tokens": 4096,
+    "total_tokens": 4251,
+    "cost": 0.123655,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.123655,
+      "upstream_inference_prompt_cost": 0.000775,
+      "upstream_inference_completions_cost": 0.12288
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 2988,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T22:21:23.942880+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "openai/gpt-5.5-20260423",
+    "reasoning": "**Considering file handling options**\n\nI\u2019m thinking about the alternative to `send_from_directory`, which is `return send_from_directory(BASE_DIR, filename, as_attachment=True)`. But then, if there are symlink concerns, I should use `resolve` for safety. I might also want to include a robust path to handle potential issues. Now, regarding imports, I\u2019m checking if I need `import urllib`\u2014but I don't think I do. I\u2019ll need to ensure I have tests in place for this functionality."
+  }
+}

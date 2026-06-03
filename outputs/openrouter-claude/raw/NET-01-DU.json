@@ -1,0 +1,34 @@
+{
+  "prompt_id": "NET-01-DU",
+  "model": "anthropic/claude-4.8-opus-20260528",
+  "text": "# Network Scanning Detection in Telemetry\n\n## 1. Common Scan Patterns\n\n**By topology:**\n- **Horizontal scan (network sweep):** One source contacts the *same port* across *many destination IPs* (e.g., probing TCP/445 across a /24). Classic for finding which hosts run a vulnerable service.\n- **Vertical scan (port scan):** One source contacts *many ports* on a *single destination*. Used to fingerprint a single host.\n- **Block scan:** Combination \u2014 many ports across many hosts.\n- **Distributed/coordinated scan:** Multiple sources scan cooperatively, each touching few targets to evade per-source thresholds.\n\n**By technique:**\n- **TCP SYN (half-open):** SYN sent, no completion of handshake (no ACK after SYN-ACK).\n- **TCP Connect:** Full three-way handshake completed (noisier, used by unprivileged tools).\n- **Stealth scans:** FIN, NULL, Xmas (unusual flag combinations).\n- **UDP scans:** Often inferred via ICMP port-unreachable responses.\n- **Slow / \"low and slow\":** Deliberately spread over hours/days to stay under thresholds.\n\n## 2. Useful Log Fields\n\nFrom flow data (NetFlow/IPFIX), firewall logs, IDS, or Zeek:\n\n| Field | Why it matters |\n|-------|----------------|\n| Source IP / Destination IP | Identify fan-out (one-to-many) |\n| Destination port | Distinguish horizontal vs vertical |\n| TCP flags | SYN-only, RST responses, anomalous flags |\n| Bytes/packets per flow | Scans = tiny flows (often single packet) |\n| Flow duration | Scans are very short-lived |\n| Connection state | Zeek `conn_state` (S0, REJ, RSTOS0) |\n| Timestamp | Reconstruct timing/cadence |\n| Action (allow/deny) | High deny ratio signals probing |\n| ICMP type/code | Port/host unreachable replies |\n\nKey derived metrics: **distinct destinations per source**, **distinct ports per (source,dest)**, **connection failure ratio**, **flow size distribution**.\n\n## 3. Thresholding Approaches\n\n- **Fixed/static thresholds:** e.g., >X unique destinations on one port within Y seconds. Simple but brittle.\n- **Failure-ratio based:** High ratio of failed (S0/REJ) to established connections \u2014 more robust than raw counts.\n- **TRW (Threshold Random Walk):** Sequential hypothesis testing \u2014 successful vs failed connection attempts shift a likelihood score; flags hosts whose failures accumulate quickly. Good for early detection.\n- **Statistical baselining / anomaly:** Compare current fan-out against the host's historical normal.\n- **Entropy-based:** Spikes in destination IP/port entropy indicate spraying behavior.\n- **Time-windowing:** Sliding windows to catch slow scans (longer windows trade detection speed for evasion resistance).\n\n## 4. False Positives\n\nLegitimate activity that mimics scanning:\n- **Vulnerability scanners / asset management** (Nessus, Qualys, Tenable, Lansweeper) \u2014 authorized but look identical to attackers.\n- **Network monitoring tools** (Nagios, SNMP pollers) hitting many hosts.\n- **Load balancers / health checks** probing backend pools.\n- **Distributed systems** \u2014 service discovery, Kubernetes, gossip protocols, P2P apps.\n- **Misconfigured applications** retrying many endpoints.\n- **NAT/proxy egress** \u2014 many users behind one IP inflating fan-out.\n- **DHCP churn** \u2014 reused IPs causing apparent new connections.\n\n## 5. Detection Strategies\n\n- **Allowlist known scanners:** Maintain inventory of authorized scanning sources, schedules, and source subnets; correlate against scanner ticketing/scan windows.\n- **Layer signals:** Combine fan-out + failure ratio + flow size rather than relying on one metric.\n- **Behavioral baselining per host role** (a domain controller vs a workstation have different normal profiles).\n- **East-west visibility:** Internal scans (lateral movement reconnaissance) matter most for post-compromise detection \u2014 monitor internal-to-internal traffic, not just perimeter.\n- **Correlate with context:** New/unmanaged source IP, off-hours timing, unusual port targets (3389, 445, 22) raise priority.\n- **IDS signatures + flow analytics together:** Signatures catch known tools; flow analytics catch novel/slow behavior.\n\n## 6. Investigation Steps\n\n1. **Scope the source:** Is it a known asset? Check CMDB/asset inventory, DNS, owner.\n2. **Characterize the pattern:** Horizontal vs vertical? Which ports? How many targets? Time span?\n3. **Check authorization:** Match against scheduled scan windows, scanner allowlist, change tickets.\n4. **Examine outcomes:** Were connections established or mostly rejected? Successful connections to sensitive ports warrant escalation.\n5. **Pivot on the source host:** Pull endpoint telemetry (EDR) \u2014 what process initiated the traffic? Authorized tool or suspicious binary?\n6. **Look for follow-on activity:** Exploitation attempts, lateral movement, credential use, data transfer after the scan.\n7. **Assess directionality:** External\u2192internal (perimeter probing), internal\u2192internal (likely lateral movement / higher concern), internal\u2192external (possible C2 or compromised host scanning out).\n8. **Contain & document:** If malicious, isolate host, preserve flow/packet evidence, and record indicators for hunting.\n\n---\n\n**Bottom line:** The signal is fan-out + failed-connection ratio + tiny short-lived flows. The hard part is *context* \u2014 legitimate discovery and malicious reconnaissance look statistically identical at the packet level, so accurate detection depends on asset inventory, scanner allowlisting, and correlating who/what/when/where rather than traffic shape alone.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 116,
+    "completion_tokens": 2075,
+    "total_tokens": 2191,
+    "cost": 0.052455,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.052455,
+      "upstream_inference_prompt_cost": 0.00058,
+      "upstream_inference_completions_cost": 0.051875
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-02T21:26:08.558054+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "anthropic/claude-4.8-opus-20260528"
+  }
+}
