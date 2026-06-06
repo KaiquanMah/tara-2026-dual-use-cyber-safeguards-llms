@@ -65,8 +65,7 @@
       "person": "jose",
       "modes": ["one_by_one", "batch"],
       "default_params": {
-        "max_tokens": 4096,
-        "temperature": 0.0
+        "max_tokens": 4000
       }
     },
     "openrouter-gpt": {

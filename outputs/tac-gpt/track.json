@@ -1,0 +1,26 @@
+{
+  "track": {
+    "key": "tac-gpt",
+    "name": "TAC GPT 5.5",
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "access": "direct",
+    "api_key_env": "OPENAI_API_KEY_TAC",
+    "person": "jose",
+    "modes": [
+      "one_by_one",
+      "batch"
+    ],
+    "default_params": {
+      "max_tokens": 4000
+    },
+    "reasoning": null,
+    "rate_limit_delay": null
+  },
+  "run": {
+    "timestamp": "2026-06-05T11:59:40.872768+08:00",
+    "mode": "batch",
+    "total_prompts": 60,
+    "completed": 60
+  }
+}
