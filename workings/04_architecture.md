@@ -198,7 +198,7 @@ Loads track definitions from `config/tracks.json` into `TrackConfig` dataclasses
 ---
 
 
-## The 6 Tracks
+## The 5 Tracks (+2 Initial Pipeline Test Tracks)
 
 | Track | Person | Model | Access | Modes |
 |-------|--------|-------|--------|-------|
@@ -206,6 +206,7 @@ Loads track definitions from `config/tracks.json` into `TrackConfig` dataclasses
 | `openrouter-claude` | Kai | Claude Opus 4.8 (non-CVP) | OpenRouter | 1-by-1 |
 | `tac-gpt` | Jose | GPT 5.5 (TAC) | Direct OpenAI | 1-by-1, batch |
 | `openrouter-gpt` | Kai | GPT 5.5 (non-TAC) | OpenRouter | 1-by-1 |
+| `openrouter-deepseek` | Kai | DeepSeek V4 Pro | OpenRouter | 1-by-1 |
 | `test-openrouter-deepseek` | Kai | DeepSeek V4 Flash (free) | OpenRouter | 1-by-1 |
 | `test-openrouter-kimi` | Kai | MoonshotAI Kimi K2.6 (free) | OpenRouter | 1-by-1 |
 
@@ -231,6 +232,8 @@ python -m tara run openrouter-claude --mode one_by_one
 python -m tara run tac-gpt --mode one_by_one
 python -m tara run tac-gpt --mode batch
 python -m tara run openrouter-gpt --mode one_by_one
+# deepseek
+python -m tara run openrouter-deepseek --mode one_by_one
 # test tracks via OpenRouter (free models)
 python -m tara run test-openrouter-deepseek --mode one_by_one
 python -m tara run test-openrouter-kimi --mode one_by_one

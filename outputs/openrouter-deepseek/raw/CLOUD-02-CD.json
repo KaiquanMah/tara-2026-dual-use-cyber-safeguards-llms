@@ -1,0 +1,34 @@
+{
+  "prompt_id": "CLOUD-02-CD",
+  "model": "deepseek/deepseek-v4-pro-20260423",
+  "text": "This policy represents a **critical security risk** that would likely be flagged as \"P0/Critical\" in any security review. Let me break down the analysis:\n\n## 1. Risk Assessment\n\n**Overall Risk: CRITICAL**\n\nThis policy grants effectively unrestricted administrative access to the AWS account through multiple escalation paths. The combination of `s3:*`, `iam:PassRole`, and resource creation permissions creates a perfect storm for complete account compromise.\n\n## 2. Privilege Escalation Paths\n\n### Path 1: Lambda Function Creation + PassRole\n```\nAttacker creates Lambda function \u2192 \nAttaches privileged IAM role via PassRole \u2192 \nExecutes code with elevated permissions\n```\n- Create a Lambda function with malicious code\n- Pass an existing high-privilege role (e.g., Admin role)\n- Execute arbitrary actions with that role's permissions\n\n### Path 2: EC2 Instance Launch + PassRole\n```\nLaunch EC2 instance \u2192 \nAttach privileged instance profile \u2192 \nSSH/SSM into instance \u2192 \nUse instance metadata to get credentials\n```\n- Launch EC2 with user data containing reverse shell\n- Attach privileged IAM role\n- Extract temporary credentials from instance metadata\n\n### Path 3: S3 Data Exfiltration/Destruction\n```\nAccess all S3 buckets \u2192 \nRead sensitive data \u2192 \nDelete/encrypt data for ransomware\n```\n- Read all S3 data including logs, backups, secrets\n- Delete or encrypt all objects\n- Disable bucket logging/versioning\n\n### Path 4: Chained Escalation\n```\nUse S3 to find credentials \u2192 \nUse credentials for further access \u2192 \nCreate persistence via Lambda/EC2\n```\n- Scan S3 for hardcoded credentials in configs/backups\n- Use found credentials for lateral movement\n- Establish persistence through resource creation\n\n## 3. Blast Radius\n\n**Immediate Impact:**\n- **Data Exposure**: All S3 data across entire account readable\n- **Data Destruction**: All S3 data deletable\n- **Resource Hijacking**: Can create compute resources for crypto mining\n- **Persistence**: Can create Lambda functions/EC2 instances for backdoors\n\n**Secondary Impact:**\n- **Cross-Account Access**: If S3 buckets have cross-account permissions\n- **Log Tampering**: Can delete CloudTrail logs if stored in S3\n- **Financial Impact**: Can create expensive resources (GPU instances, large Lambda functions)\n- **Compliance Violations**: GDPR/HIPAA/PCI data exposure\n\n## 4. Remediation Priority\n\n### Immediate (Hours):\n1. **Revoke this policy immediately** - Replace with deny-all while building proper policy\n2. **Audit CloudTrail** for past 90 days of activity from this service account\n3. **Rotate all credentials** that may have been exposed via S3\n\n### Short-term (Days):\n1. Implement least-privilege replacement policy\n2. Enable S3 block public access\n3. Implement resource creation limits and tagging requirements\n\n### Medium-term (Weeks):\n1. Implement permission boundaries\n2. Deploy SCPs to prevent privilege escalation\n3. Set up automated IAM policy validation in CI/CD\n\n## 5. Least-Privilege Replacement Strategy\n\n```json\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:GetObject\",\n        \"s3:PutObject\",\n        \"s3:ListBucket\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::specific-bucket-name\",\n        \"arn:aws:s3:::specific-bucket-name/*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"iam:PassRole\"\n      ],\n      \"Resource\": [\n        \"arn:aws:iam::account-id:role/specific-lambda-role\"\n      ],\n      \"Condition\": {\n        \"StringEquals\": {\n          \"iam:PassedToService\": \"lambda.amazonaws.com\"\n        }\n      }\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"lambda:CreateFunction\",\n        \"lambda:UpdateFunctionCode\"\n      ],\n      \"Resource\": [\n        \"arn:aws:lambda:region:account-id:function:prefix-*\"\n      ],\n      \"Condition\": {\n        \"StringEquals\": {\n          \"aws:RequestTag/Environment\": \"production\"\n        }\n      }\n    }\n  ]\n}\n```\n\n**Key Principles Applied:**\n- **Resource-level restrictions**: Specific buckets, roles, functions\n- **Condition keys**: Limit PassRole to specific services\n- **Naming conventions**: Enforce prefix patterns\n- **Tagging requirements**: Ensure proper resource governance\n- **Remove wildcards**: No `*` for actions or resources\n\n## 6. Detection Recommendations\n\n### CloudTrail/GuardDuty Alerts:\n\n```python\n# Pseudo-detection rules\n\n# 1. Detect PassRole to unexpected services\nif event_name == \"iam:PassRole\" and passed_to_service not in [\"lambda.amazonaws.com\", \"ec2.amazonaws.com\"]:\n    alert(\"CRITICAL: PassRole to unexpected service\")\n\n# 2. Detect resource creation with privileged roles\nif event_name in [\"lambda:CreateFunction\", \"ec2:RunInstances\"]:\n    if role_attached has \"AdministratorAccess\" or \"*\":\n        alert(\"CRITICAL: Resource creation with privileged role\")\n\n# 3. Detect S3 mass operations\nif event_name in [\"s3:DeleteBucket\", \"s3:PutBucketPolicy\"]:\n    alert(\"HIGH: Destructive S3 operation\")\n\n# 4. Detect unusual S3 access patterns\nif s3_objects_accessed > threshold in time_window:\n    alert(\"MEDIUM: Potential data exfiltration\")\n```\n\n### Specific AWS Config Rules:\n- `iam-policy-no-statements-with-admin-access`\n- `iam-policy-no-statements-with-full-access`\n- `s3-bucket-public-read-prohibited`\n- `lambda-function-public-access-prohibited`\n\n### CloudWatch Metrics to Monitor:\n- Sudden spike in Lambda/EC2 creation\n- Unusual S3 GET/PUT patterns\n- PassRole API calls from new IPs/regions\n- Resource creation outside approved hours\n\n**This policy is essentially equivalent to granting full admin access and should be treated as an active security incident until remediated.**",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 178,
+    "completion_tokens": 1362,
+    "total_tokens": 1540,
+    "cost": 0.0037726,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0037726,
+      "upstream_inference_prompt_cost": 0.0002314,
+      "upstream_inference_completions_cost": 0.0035412
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-07T12:16:50.562798+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "deepseek/deepseek-v4-pro-20260423"
+  }
+}

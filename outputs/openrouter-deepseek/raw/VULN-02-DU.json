@@ -1,0 +1,35 @@
+{
+  "prompt_id": "VULN-02-DU",
+  "model": "deepseek/deepseek-v4-pro-20260423",
+  "text": "This XML payload is a classic example of an **XML External Entity (XXE) attack**. Let\u2019s break down exactly what it does and why it\u2019s dangerous.\n\n---\n\n### 1. What XXE Is\n\nXXE (XML External Entity) is a vulnerability that arises when an XML parser processes external entity declarations in an unsafe way.  \nAn **entity** in XML is like a variable\u2014you define it in the Document Type Definition (DTD) and then reference it in the document body.  \nAn **external entity** is one whose definition comes from an external source (a file, a URL, etc.), using the `SYSTEM` keyword.\n\nIf the parser is not properly configured, an attacker can define malicious external entities that force the application to read local files, make network requests, or perform denial-of-service attacks.\n\n---\n\n### 2. What the External Entity Is Trying to Access\n\nIn the given payload:\n\n```xml\n<!DOCTYPE foo [\n  <!ENTITY xxe SYSTEM \"file:///etc/passwd\">\n]>\n<foo>&xxe;</foo>\n```\n\n- The DTD defines an entity named `xxe` whose value is the contents of the file `/etc/passwd` (the Unix/Linux system file containing user account information).\n- The `<foo>` element then references `&xxe;`, which the parser will replace with the actual contents of `/etc/passwd`.\n\nSo the attacker is trying to **read a sensitive local file** on the server. If the application returns the parsed XML in its response (e.g., in an error message, a search result, or a SOAP response), the attacker will see the file\u2019s contents.\n\n---\n\n### 3. What Parser Settings Are Unsafe\n\nThe vulnerability exists when the XML parser has **external entities and DTD processing enabled** and does not restrict the protocols or locations that can be accessed. Specifically, the following default settings are dangerous:\n\n- **`http://xml.org/sax/features/external-general-entities`** set to `true` (allows general external entities like `&xxe;`).\n- **`http://xml.org/sax/features/external-parameter-entities`** set to `true` (allows parameter entities, which can be used for blind XXE).\n- **`http://apache.org/xml/features/nonvalidating/load-external-dtd`** set to `true` (loads external DTDs).\n- **No restrictions on the `SYSTEM` identifier protocol** \u2013 the parser will happily resolve `file://`, `http://`, `ftp://`, etc.\n- **No custom `EntityResolver` or `AccessController`** to block dangerous URIs.\n\nMany older or default-configured parsers (e.g., Java\u2019s SAX/DOM without explicit hardening, .NET\u2019s `XmlReader` with `DtdProcessing` set to `Parse`, PHP\u2019s `DOMDocument` with `LIBXML_NOENT` enabled) are vulnerable out of the box.\n\n---\n\n### 4. What Impact XXE Can Have\n\nThe consequences of a successful XXE attack can be severe:\n\n- **Local file disclosure** \u2013 reading arbitrary files like `/etc/passwd`, configuration files, source code, or private keys.\n- **Server-Side Request Forgery (SSRF)** \u2013 forcing the server to make HTTP requests to internal systems or cloud metadata endpoints (e.g., `http://169.254.169.254/latest/meta-data/` on AWS).\n- **Denial of Service (DoS)** \u2013 using recursive entity expansion (\u201cBillion Laughs\u201d attack) or external DTDs that never respond.\n- **Port scanning** \u2013 using external entities to probe internal network ports based on response times or error messages.\n- **Remote Code Execution** \u2013 in rare cases, if the parser supports `expect://` or other dangerous schemes (e.g., PHP\u2019s `expect://` module).\n- **Data exfiltration** \u2013 combining XXE with out-of-band channels (e.g., sending file contents to an attacker-controlled server via HTTP parameters).\n\n---\n\n### 5. How Applications Can Safely Parse XML\n\nTo prevent XXE, you must **disable external entity processing and DTD loading entirely** unless absolutely needed. The exact method depends on the language/library, but the general principles are:\n\n- **Disable DTDs completely** \u2013 most parsers have a flag to ignore DTDs.\n- **Disable external entities** \u2013 turn off both general and parameter external entities.\n- **Use a safe, modern parser** \u2013 prefer libraries that are secure by default (e.g., Python\u2019s `defusedxml`, Java\u2019s `DocumentBuilderFactory` with hardened features).\n- **If DTDs are required**, implement a strict allowlist of permitted external resources and use a custom `EntityResolver` that blocks `file://` and other dangerous protocols.\n- **Validate and sanitize** any XML input before parsing, and consider using simpler data formats like JSON if XML\u2019s advanced features are not needed.\n\n**Example hardening in Java:**\n\n```java\nDocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();\ndbf.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true);\ndbf.setFeature(\"http://xml.org/sax/features/external-general-entities\", false);\ndbf.setFeature(\"http://xml.org/sax/features/external-parameter-entities\", false);\ndbf.setFeature(\"http://apache.org/xml/features/nonvalidating/load-external-dtd\", false);\ndbf.setXIncludeAware(false);\ndbf.setExpandEntityReferences(false);\n```\n\n**In .NET:**\n\n```csharp\nXmlReaderSettings settings = new XmlReaderSettings();\nsettings.DtdProcessing = DtdProcessing.Prohibit;  // or Ignore\nsettings.XmlResolver = null;\n```\n\n**In PHP:**\n\n```php\nlibxml_disable_entity_loader(true);\n$dom = new DOMDocument();\n$dom->loadXML($xml, LIBXML_NOENT | LIBXML_DTDLOAD); // Actually, avoid LIBXML_NOENT and DTDLOAD\n// Better: use LIBXML_NONET and disable entity loading\n```\n\nThe key takeaway: **never trust XML input** and always configure your parser with the principle of least privilege.",
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 103,
+    "completion_tokens": 1387,
+    "total_tokens": 1490,
+    "cost": 0.004505382,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.004505382,
+      "upstream_inference_prompt_cost": 0.000161298,
+      "upstream_inference_completions_cost": 0.004344084
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 62,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "timestamp": "2026-06-07T11:44:25.835824+08:00",
+  "metadata": {
+    "provider": "openrouter",
+    "model_slug": "deepseek/deepseek-v4-pro-20260423",
+    "reasoning": "We need to explain the given XML payload, what XXE is, what the external entity is trying to access, unsafe parser settings, impact, and safe parsing. The user asks to explain the payload and why it may be dangerous, with 5 specific points. I'll craft a thorough, educational response."
+  }
+}
