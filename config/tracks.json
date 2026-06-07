@@ -65,13 +65,28 @@
       "person": "jose",
       "modes": ["one_by_one", "batch"],
       "default_params": {
-        "max_tokens": 4000
+        "max_tokens": 4096,
+        "temperature": 0.0
       }
     },
     "openrouter-gpt": {
       "name": "Non-TAC GPT 5.5 via OpenRouter",
       "provider": "openrouter",
       "model": "openai/gpt-5.5",
+      "access": "openrouter",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "person": "kai",
+      "modes": ["one_by_one"],
+      "reasoning": ["xhigh", "high"],
+      "default_params": {
+        "max_tokens": 4096,
+        "temperature": 0.0
+      }
+    },
+    "openrouter-deepseek": {
+      "name": "DeepSeek V4 Pro via OpenRouter",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-pro",
       "access": "openrouter",
       "api_key_env": "OPENROUTER_API_KEY",
       "person": "kai",
