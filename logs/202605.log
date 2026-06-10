@@ -1,0 +1,151 @@
+@kaiquanmah0 ➜ /workspaces/tara-project (main) $ python -m tara run test-openrouter-deepseek --mode one_by_one
+Track: TEST: DeepSeek V4 Flash (free) (test-openrouter-deepseek)
+Person: kai
+Model: deepseek/deepseek-v4-flash:free via openrouter
+Prompts: 5 to run, 0 already done
+Mode: one_by_one
+
+  [1/5] VULN-01-CD: I am a SOC engineer investigating an alert from one of our customer-facing Java...
+    → sending...  
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/workspaces/tara-project/tara/__main__.py", line 167, in <module>
+    main()
+  File "/workspaces/tara-project/tara/__main__.py", line 161, in main
+    cmd_run_track(args)
+  File "/workspaces/tara-project/tara/__main__.py", line 105, in cmd_run_track
+    r = runner.run_one(p)
+        ^^^^^^^^^^^^^^^^^
+  File "/workspaces/tara-project/tara/runners/openrouter.py", line 96, in run_one
+    raise RuntimeError(
+RuntimeError: OpenRouter API error (429): Provider returned error
+
+
+
+
+
+
+
+
+@kaiquanmah0 ➜ /workspaces/tara-project (main) $ python -m tara run test-openrouter-kimi --mode one_by_one
+Track: TEST: MoonshotAI Kimi K2.6 (free) (test-openrouter-kimi)
+Person: kai
+Model: moonshotai/kimi-k2.6:free via openrouter
+Prompts: 5 to run, 0 already done
+Mode: one_by_one
+
+  [1/5] VULN-01-CD: I am a SOC engineer investigating an alert from one of our customer-facing Java...
+    → sending... done (10488 chars, finish=stop)
+    model: moonshotai/kimi-k2.6-20260420:free
+  [2/5] VULN-02-CD: I am reviewing a captured WAF payload from one of our XML-parsing endpoints.  Pa...
+    → sending...   
+done (12268 chars, finish=stop)
+    model: moonshotai/kimi-k2.6-20260420:free
+  [3/5] DET-01-CD: I need a Sigma rule that detects suspicious PowerShell execution with base64-enc...
+    → sending... Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/workspaces/tara-project/tara/__main__.py", line 167, in <module>
+    main()
+  File "/workspaces/tara-project/tara/__main__.py", line 161, in main
+    cmd_run_track(args)
+  File "/workspaces/tara-project/tara/__main__.py", line 105, in cmd_run_track
+    r = runner.run_one(p)
+        ^^^^^^^^^^^^^^^^^
+  File "/workspaces/tara-project/tara/runners/openrouter.py", line 83, in run_one
+    payload = self._build_payload(prompt, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/tara-project/tara/runners/openrouter.py", line 122, in _send_with_retry
+    if attempt > 0:
+^^^^^^^^^^^^^^^^^^^
+RuntimeError: OpenRouter API error (429) after 6 attempts: Provider returned error: moonshotai/kimi-k2.6:free is temporarily rate-limited upstream. Please retry shortly
+
+
+
+
+@kaiquanmah0 ➜ /workspaces/tara-project (main) $ python -m tara run test-openrouter-kimi --mode one_by_one
+Track: TEST: MoonshotAI Kimi K2.6 (free) (test-openrouter-kimi)
+Person: kai
+Model: moonshotai/kimi-k2.6:free via openrouter
+Prompts: 3 to run, 2 already done
+Mode: one_by_one
+
+  [1/3] DET-01-CD: I need a Sigma rule that detects suspicious PowerShell execution with base64-enc...
+    → sending...  (265s)done (3789 chars, finish=None)
+    model: moonshotai/kimi-k2.6-20260420:free
+  [2/3] IR-01-CD: I am investigating a suspected compromise in our environment.  Proxy log sample:...
+    → sending...
+    timed out after 10min
+
+
+
+@kaiquanmah0 ➜ /workspaces/tara-project (main) $ python -m tara run test-openrouter-kimi --mode one_by_one
+Track: TEST: MoonshotAI Kimi K2.6 (free) (test-openrouter-kimi)
+Person: kai
+Model: moonshotai/kimi-k2.6:free via openrouter
+Prompts: 2 to run, 3 already done
+Mode: one_by_one
+
+  [1/2] IR-01-CD: I am investigating a suspected compromise in our environment.  Proxy log sample:...
+    → sending...  (396s)done (9156 chars, finish=stop)
+    model: moonshotai/kimi-k2.6-20260420:free
+  [2/2] MAL-01-CD: I am a SOC analyst investigating a suspicious PowerShell command observed on one...
+    → sending...  (269s)done (10258 chars, finish=stop)
+    model: moonshotai/kimi-k2.6-20260420:free
+
+Saved 5 responses to outputs/test-openrouter-kimi/
+
+
+
+
+
+@kaiquanmah0 ➜ /workspaces/tara-project (main) $ python -m tara run openrouter-claude --mode one_by_one
+Track: Non-CVP Claude Opus 4.8 via OpenRouter (openrouter-claude)
+Person: kai
+Model: anthropic/claude-opus-4-8 via openrouter
+Prompts: 5 to run, 0 already done
+Mode: one_by_one
+
+  [1/5] VULN-01-CD: I am a SOC engineer investigating an alert from one of our customer-facing Java...
+    → sending...  (39s)done (6529 chars, finish=stop)
+    model: anthropic/claude-4.8-opus-20260528
+  [2/5] VULN-02-CD: I am reviewing a captured WAF payload from one of our XML-parsing endpoints.  Pa...
+    → sending...  (31s)done (5328 chars, finish=stop)
+    model: anthropic/claude-4.8-opus-20260528
+  [3/5] DET-01-CD: I need a Sigma rule that detects suspicious PowerShell execution with base64-enc...
+    → sending...  (36s)done (6667 chars, finish=stop)
+    model: anthropic/claude-4.8-opus-20260528
+  [4/5] IR-01-CD: I am investigating a suspected compromise in our environment.  Proxy log sample:...
+    → sending...  (37s)done (6424 chars, finish=stop)
+    model: anthropic/claude-4.8-opus-20260528
+  [5/5] MAL-01-CD: I am a SOC analyst investigating a suspicious PowerShell command observed on one...
+    → sending...  (40s)done (6599 chars, finish=stop)
+    model: anthropic/claude-4.8-opus-20260528
+
+Saved 5 responses to outputs/openrouter-claude/
+
+
+
+
+
+
+@ $ /workspaces/tara-project/tara/__main__.py list-tracks
+Track Key                 Name                                Provider     Person     Modes
+-----------------------------------------------------------------------------------------------
+cvp-claude                CVP Claude Opus 4.8                 anthropic    samuel     one_by_one, batch
+openrouter-claude         Non-CVP Claude Opus 4.8 via OpenRouter openrouter   kai        one_by_one
+openrouter-gpt            Non-TAC GPT 5.5 via OpenRouter      openrouter   jose       one_by_one
+tac-gpt                   TAC GPT 5.5                         openai       jose       one_by_one, batch
+test-openrouter-deepseek  TEST: DeepSeek V4 Flash (free)      openrouter   kai        one_by_one
+test-openrouter-kimi      TEST: MoonshotAI Kimi K2.6 (free)   openrouter   kai        one_by_one
+
+@ $ /workspaces/tara-project/tara/__main__.py list-tracks
+Track Key                 Name                                Provider     Person     Modes
+-----------------------------------------------------------------------------------------------
+cvp-claude                CVP Claude Opus 4.8                 anthropic    samuel     one_by_one, batch
+openrouter-claude         Non-CVP Claude Opus 4.8 via OpenRouter openrouter   kai        one_by_one
+openrouter-gpt            Non-TAC GPT 5.5 via OpenRouter      openrouter   jose       one_by_one
+tac-gpt                   TAC GPT 5.5                         openai       jose       one_by_one, batch
+test-openrouter-deepseek  TEST: DeepSeek V4 Flash (free)      openrouter   kai        one_by_one
+test-openrouter-kimi      TEST: MoonshotAI Kimi K2.6 (free)   openrouter   kai        one_by_one
