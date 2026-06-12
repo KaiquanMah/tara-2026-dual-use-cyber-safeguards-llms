@@ -155,8 +155,8 @@ python -m tara run openrouter-claude --prompts prompts_5_jose.json
 | `tac-gpt` | Jose | GPT 5.5 (TAC) | Direct OpenAI | Complete |
 | `openrouter-gpt` | Kai | GPT 5.5 (non-TAC) | OpenRouter | Complete |
 | `openrouter-deepseek` | Kai | DeepSeek V4 Pro | OpenRouter | Complete |
-| `test-openrouter-deepseek` | Kai | DeepSeek V4 Flash (free) | OpenRouter | Complete |
-| `test-openrouter-kimi` | Kai | MoonshotAI Kimi K2.6 (free) | OpenRouter | Complete |
+| `test-openrouter-deepseek` | NA | DeepSeek V4 Flash (free) | OpenRouter | Complete |
+| `test-openrouter-kimi` | NA | MoonshotAI Kimi K2.6 (free) | OpenRouter | Complete |
 
 ---
 
