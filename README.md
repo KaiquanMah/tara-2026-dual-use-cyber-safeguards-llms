@@ -1,10 +1,12 @@
 # Dual-Use Cyber Safeguards in Frontier Models
 
-Evaluate how frontier model cyber safeguards work with blue and red cybersecurity teams.
+A Inspect-AI cyber safeguard calibration benchmark. 
+
+Benchmarks how frontier model cyber safeguards affect cyber use and misuse of AI capabilities. 
 
 **2026 TARA Project**
 
-Samuel Ong (SG) | Jose Pulickal (AU - Melbourne) | Kaiquan Mah (SG)
+Jose Pulickal (AU - Melbourne) | Kaiquan Mah (SG) | Samuel Ong (SG) |
 
 ---
 
