@@ -7,7 +7,7 @@ Benchmarks how frontier model cyber safeguards affect cyber use and misuse of AI
 **2026 TARA Project**
 
 Jose Johny Pulickal (AU - Melbourne) | Kaiquan Mah (SG) | Samuel Ong (SG) |
-* [Slides presented in Melbourne] (https://docs.google.com/presentation/d/1-frTqgUiC6riHIe7osdlCSb-MOhJf0NlGrIi5U_XeW4/edit?usp=sharing)
+* [Slides presented in Melbourne](https://docs.google.com/presentation/d/1-frTqgUiC6riHIe7osdlCSb-MOhJf0NlGrIi5U_XeW4/edit?usp=sharing)
 * [Slides presented in Singapore](presentations/TARA%20-%20Dual-Use%20Cyber%20Safeguards%20in%20Frontier%20Models.pdf)
 
 
